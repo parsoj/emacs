@@ -452,11 +452,9 @@ ev_modifiers_helper (unsigned int flags, unsigned int left_mask,
 
 /* These flags will be OR'd or XOR'd with the NSWindow's styleMask
    property depending on what we're doing.  */
-#define FRAME_DECORATED_FLAGS (NSWindowStyleMaskTitled              \
-                               | NSWindowStyleMaskResizable         \
+#define FRAME_UNDECORATED_FLAGS (NSWindowStyleMaskResizable         \
                                | NSWindowStyleMaskMiniaturizable    \
                                | NSWindowStyleMaskClosable)
-#define FRAME_UNDECORATED_FLAGS NSWindowStyleMaskBorderless
 
 /* TODO: Get rid of need for these forward declarations.  */
 static void ns_condemn_scroll_bars (struct frame *f);
@@ -827,6 +825,7 @@ ns_row_rect (struct window *w, struct glyph_row *row,
                enum glyph_row_area area)
 /* Get the row as an NSRect.  */
 {
+  struct frame *f = XFRAME (WINDOW_FRAME (w));
   NSRect rect;
   int window_x, window_y, window_width;
 
@@ -1811,23 +1810,11 @@ ns_set_undecorated (struct frame *f, Lisp_Object new_value, Lisp_Object old_valu
     {
       block_input ();
 
-      if (NILP (new_value))
-        {
-          FRAME_UNDECORATED (f) = false;
-          [window setStyleMask: ((window.styleMask | FRAME_DECORATED_FLAGS)
-                                  ^ FRAME_UNDECORATED_FLAGS)];
+      [window setToolbar: nil];
+      /* Do I need to release the toolbar here?  */
 
-          [view createToolbar: f];
-        }
-      else
-        {
-          [window setToolbar: nil];
-          /* Do I need to release the toolbar here?  */
-
-          FRAME_UNDECORATED (f) = true;
-          [window setStyleMask: ((window.styleMask | FRAME_UNDECORATED_FLAGS)
-                                 ^ FRAME_DECORATED_FLAGS)];
-        }
+      FRAME_UNDECORATED (f) = true;
+      [window setStyleMask: (window.styleMask | FRAME_UNDECORATED_FLAGS)];
 
       /* At this point it seems we don't have an active NSResponder,
          so some key presses (TAB) are swallowed by the system.  */
@@ -2466,7 +2453,7 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 
   if (*fp == NULL)
     {
-      fputs ("Warning: ns_mouse_position () called with null *fp.\n", stderr);
+      fprintf (stderr, "Warning: ns_mouse_position () called with null *fp.\n");
       return;
     }
 
@@ -2480,11 +2467,7 @@ ns_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
       XFRAME (frame)->mouse_moved = 0;
 
   dpyinfo->last_mouse_scroll_bar = nil;
-  f = dpyinfo->ns_focus_frame ? dpyinfo->ns_focus_frame : SELECTED_FRAME ();
   if (dpyinfo->last_mouse_frame
-      /* While dropping, use the last mouse frame only if there is no
-	 currently focused frame.  */
-      && (!EQ (track_mouse, Qdropping) || !f)
       && FRAME_LIVE_P (dpyinfo->last_mouse_frame))
     f = dpyinfo->last_mouse_frame;
   else
@@ -3917,13 +3900,10 @@ ns_dumpglyphs_stretch (struct glyph_string *s)
   if (!s->background_filled_p)
     {
       n = ns_get_glyph_string_clip_rect (s, r);
+      *r = NSMakeRect (s->x, s->y, s->background_width, s->height);
 
       if (ns_clip_to_rect (s->f, r, n))
         {
-          /* FIXME: Why are we reusing the clipping rectangles? The
-             other terms don't appear to do anything like this.  */
-          *r = NSMakeRect (s->x, s->y, s->background_width, s->height);
-
           if (s->hl == DRAW_MOUSE_FACE)
             {
               face = FACE_FROM_ID_OR_NULL (s->f,
@@ -3958,6 +3938,13 @@ ns_dumpglyphs_stretch (struct glyph_string *s)
                         r[i].origin.x += leftoverrun;
                         r[i].size.width -= leftoverrun;
                       }
+
+                    /* XXX: Try to work between problem where a stretch glyph on
+                       a partially-visible bottom row will clear part of the
+                       modeline, and another where list-buffers headers and similar
+                       rows erroneously have visible_height set to 0.  Not sure
+                       where this is coming from as other terms seem not to show.  */
+                    r[i].size.height = min (s->height, s->row->visible_height);
                 }
 
               [bgCol set];
@@ -5613,7 +5600,7 @@ ns_term_shutdown (int sig)
 
   if (type == NSEventTypeCursorUpdate && window == nil)
     {
-      fputs ("Dropping external cursor update event.\n", stderr);
+      fprintf (stderr, "Dropping external cursor update event.\n");
       return;
     }
 
@@ -6333,7 +6320,7 @@ not_in_argv (NSString *arg)
      https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/EventOverview/HandlingKeyEvents/HandlingKeyEvents.html.  */
 
   if (NS_KEYLOG && !processingCompose)
-    fputs ("keyDown: Begin compose sequence.\n", stderr);
+    fprintf (stderr, "keyDown: Begin compose sequence.\n");
 
   /* FIXME: interpretKeyEvents doesn’t seem to send insertText if ⌘ is
      used as shift-like modifier, at least on El Capitan.  Mask it
@@ -6949,36 +6936,7 @@ not_in_argv (NSString *arg)
   NSTRACE_MSG  ("Original columns: %d", cols);
   NSTRACE_MSG  ("Original rows: %d", rows);
 
-  if (! [self isFullscreen])
-    {
-      int toolbar_height;
-#ifdef NS_IMPL_GNUSTEP
-      // GNUstep does not always update the tool bar height.  Force it.
-      if (toolbar && [toolbar isVisible])
-          update_frame_tool_bar (emacsframe);
-#endif
-
-      toolbar_height = FRAME_TOOLBAR_HEIGHT (emacsframe);
-      if (toolbar_height < 0)
-        toolbar_height = 35;
-
-      extra = FRAME_NS_TITLEBAR_HEIGHT (emacsframe)
-        + toolbar_height;
-    }
-
-  if (wait_for_tool_bar)
-    {
-      /* The toolbar height is always 0 in fullscreen and undecorated
-         frames, so don't wait for it to become available.  */
-      if (FRAME_TOOLBAR_HEIGHT (emacsframe) == 0
-          && FRAME_UNDECORATED (emacsframe) == false
-          && ! [self isFullscreen])
-        {
-          NSTRACE_MSG ("Waiting for toolbar");
-          return;
-        }
-      wait_for_tool_bar = NO;
-    }
+  wait_for_tool_bar = NO;
 
   neww = (int)wr.size.width - emacsframe->border_width;
   newh = (int)wr.size.height - extra;
@@ -7353,11 +7311,9 @@ not_in_argv (NSString *arg)
   maximizing_resize = NO;
 #endif
 
-  win = [[EmacsWindow alloc]
+  win = [[EmacsFSWindow alloc]
             initWithContentRect: r
-                      styleMask: (FRAME_UNDECORATED (f)
-                                  ? FRAME_UNDECORATED_FLAGS
-                                  : FRAME_DECORATED_FLAGS)
+                      styleMask: FRAME_UNDECORATED_FLAGS
                         backing: NSBackingStoreBuffered
                           defer: YES];
 
@@ -7389,10 +7345,6 @@ not_in_argv (NSString *arg)
   name = [NSString stringWithUTF8String:
                    NILP (tem) ? "Emacs" : SSDATA (tem)];
   [win setTitle: name];
-
-  /* toolbar support */
-  if (! FRAME_UNDECORATED (f))
-    [self createToolbar: f];
 
 #if defined (NS_IMPL_COCOA) && MAC_OS_X_VERSION_MAX_ALLOWED >= 101000
 #ifndef NSAppKitVersionNumber10_10
@@ -8291,7 +8243,7 @@ not_in_argv (NSString *arg)
     }
   else
     {
-      fputs ("Invalid data type in dragging pasteboard\n", stderr);
+      fprintf (stderr, "Invalid data type in dragging pasteboard");
       return NO;
     }
 
@@ -9298,7 +9250,7 @@ ns_xlfd_to_fontname (const char *xlfd)
     sscanf (xlfd, "-%*[^-]-%179[^-]-", name);
 
   /* stopgap for malformed XLFD input */
-  if (!*name)
+  if (strlen (name) == 0)
     strcpy (name, "Monaco");
 
   /* undo hack in ns_fontname_to_xlfd, converting '$' to '-', '_' to ' '
