@@ -184,7 +184,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    infrequently.  These include the face of the characters, whether
    text is invisible, the object (buffer or display or overlay string)
    being iterated, character composition info, etc.  For any given
-   buffer or string position, these sources of information that
+   buffer or string position, the sources of information that
    affects the display can be determined by calling the appropriate
    primitives, such as Fnext_single_property_change, but both these
    calls and the processing of their return values is relatively
@@ -214,7 +214,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    string's interval tree to determine where the text properties
    change, finds the next position where overlays and character
    composition can change, and stores in stop_charpos the closest
-   position where any of these factors should be reconsider.
+   position where any of these factors should be reconsidered.
 
    Producing glyphs.
 
@@ -20463,7 +20463,7 @@ append_space_for_newline (struct it *it, bool default_face_p)
 static void
 extend_face_to_end_of_line (struct it *it)
 {
-  struct face *face, *default_face;
+  struct face *face;
   struct frame *f = it->f;
 
   /* If line is already filled, do nothing.  Non window-system frames
@@ -20480,10 +20480,6 @@ extend_face_to_end_of_line (struct it *it)
       && !(WINDOW_LEFT_MARGIN_WIDTH (it->w) > 0
 	   || WINDOW_RIGHT_MARGIN_WIDTH (it->w) > 0))
     return;
-
-  /* The default face, possibly remapped. */
-  default_face =
-    FACE_FROM_ID_OR_NULL (f, lookup_basic_face (it->w, f, DEFAULT_FACE_ID));
 
   /* Face extension extends the background and box of IT->face_id
      to the end of the line.  If the background equals the background
@@ -20517,7 +20513,14 @@ extend_face_to_end_of_line (struct it *it)
       it->face_id = FACE_FOR_CHAR (f, face, 0, -1, Qnil);
     }
 
+  /* The default face, possibly remapped. */
+  struct face *default_face =
+    FACE_FROM_ID (f, lookup_basic_face (it->w, f, DEFAULT_FACE_ID));
+
 #ifdef HAVE_WINDOW_SYSTEM
+  if (default_face == NULL)
+    error ("extend_face_to_end_of_line: default_face is not set!");
+
   if (FRAME_WINDOW_P (f))
     {
       /* If the row is empty, add a space with the current face of IT,
