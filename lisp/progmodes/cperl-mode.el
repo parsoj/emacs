@@ -77,46 +77,17 @@
 
 (eval-when-compile (require 'cl-lib))
 
+(defvar msb-menu-cond)
+(defvar gud-perldb-history)
 (defvar vc-rcs-header)
 (defvar vc-sccs-header)
 
-(eval-when-compile
-      (condition-case nil
-	  (require 'custom)
-	(error nil))
-      (condition-case nil
-	  (require 'man)
-	(error nil))
-      (defvar msb-menu-cond)
-      (defvar gud-perldb-history)
-      (defvar font-lock-background-mode) ; not in Emacs
-      (defvar font-lock-display-type)	; ditto
-      (defvar paren-backwards-message)	; Not in newer XEmacs?
-      (defmacro cperl-is-face (arg)	; Takes quoted arg
-	(cond ((fboundp 'find-face)
-	       `(find-face ,arg))
-	      (;;(and (fboundp 'face-list)
-	       ;;	(face-list))
-	       (fboundp 'face-list)
-	       `(member ,arg (and (fboundp 'face-list)
-                                  (face-list))))
-	      (t
-	       `(boundp ,arg))))
-      (defmacro cperl-make-face (arg descr) ; Takes unquoted arg
-	(cond ((fboundp 'make-face)
-	       `(make-face (quote ,arg)))
-	      (t
-	       `(defvar ,arg (quote ,arg) ,descr))))
-      (defmacro cperl-force-face (arg descr) ; Takes unquoted arg
-	`(progn
-	     (or (cperl-is-face (quote ,arg))
-		 (cperl-make-face ,arg ,descr))
-	     (or (boundp (quote ,arg)) ; We use unquoted variants too
-		 (defvar ,arg (quote ,arg) ,descr))))
-      (defmacro cperl-etags-snarf-tag (_file _line)
-	'(etags-snarf-tag))
-      (defmacro cperl-etags-goto-tag-location (elt)
-	`(etags-goto-tag-location ,elt)))
+(defmacro cperl-force-face (arg descr)  ; Takes unquoted arg
+  `(progn
+     (or (facep (quote ,arg))
+	 (make-face ,arg))
+     (or (boundp (quote ,arg))          ; We use unquoted variants too
+	 (defvar ,arg (quote ,arg) ,descr))))
 
 (defun cperl-choose-color (&rest list)
   (let (answer)
@@ -704,7 +675,7 @@ to detect it and bulk out).
 
 See documentation of a variable `cperl-problems-old-emaxen' for the
 problems which disappear if you upgrade Emacs to a reasonably new
-version (20.3 for Emacs, and those of 2004 for XEmacs).")
+version (20.3 for Emacs).")
 
 (defvar cperl-problems-old-emaxen 'please-ignore-this-line
   "Description of problems in CPerl mode specific for older Emacs versions.
@@ -712,8 +683,7 @@ version (20.3 for Emacs, and those of 2004 for XEmacs).")
 Emacs had a _very_ restricted syntax parsing engine until version
 20.1.  Most problems below are corrected starting from this version of
 Emacs, and all of them should be fixed in version 20.3.  (Or apply
-patches to Emacs 19.33/34 - see tips.)  XEmacs was very backward in
-this respect (until 2003).
+patches to Emacs 19.33/34 - see tips.)
 
 Note that even with newer Emacsen in some very rare cases the details
 of interaction of `font-lock' and syntaxification may be not cleaned
@@ -1354,7 +1324,7 @@ the last)."
 (defvar cperl-sub-regexp (regexp-opt cperl-sub-keywords))
 
 (defun cperl-char-ends-sub-keyword-p (char)
-  "Return T if CHAR is the last character of a perl sub keyword."
+  "Return t if CHAR is the last character of a perl sub keyword."
   (cl-loop for keyword in cperl-sub-keywords
            when (eq char (aref keyword (1- (length keyword))))
            return t))
@@ -5792,10 +5762,10 @@ indentation and initial hashes.  Behaves usually outside of comment."
 		font-lock-variable-name-face)      ; Just to put something
 	      t)
 	     ("\\(@\\|\\$#\\)\\(\\$+\\([a-zA-Z_:][a-zA-Z0-9_:]*\\|[^ \t\n]\\)\\)"
-	      (1 cperl-array-face)
+	      (1 'cperl-array-face)
 	      (2 font-lock-variable-name-face))
 	     ("\\(%\\)\\(\\$+\\([a-zA-Z_:][a-zA-Z0-9_:]*\\|[^ \t\n]\\)\\)"
-	      (1 cperl-hash-face)
+	      (1 'cperl-hash-face)
 	      (2 font-lock-variable-name-face))
 ;;("\\([smy]\\|tr\\)\\([^a-z_A-Z0-9]\\)\\(\\([^\n\\]*||\\)\\)\\2")
 ;;; Too much noise from \s* @s[ and friends
@@ -5897,8 +5867,6 @@ indentation and initial hashes.  Behaves usually outside of comment."
 		      t
 		      nil))))
 	  ;; Do it the dull way, without choose-color
-	  (defvar cperl-guessed-background nil
-	    "Display characteristics as guessed by cperl.")
 	  (cperl-force-face font-lock-constant-face
 			    "Face for constant and label names")
 	  (cperl-force-face font-lock-variable-name-face
@@ -5913,10 +5881,6 @@ indentation and initial hashes.  Behaves usually outside of comment."
 			    "Face for comments")
 	  (cperl-force-face font-lock-function-name-face
 			    "Face for function names")
-	  (cperl-force-face cperl-hash-face
-			    "Face for hashes")
-	  (cperl-force-face cperl-array-face
-			    "Face for arrays")
 	  ;;(defvar font-lock-constant-face 'font-lock-constant-face)
 	  ;;(defvar font-lock-variable-name-face 'font-lock-variable-name-face)
 	  ;;(or (boundp 'font-lock-type-face)
@@ -5927,30 +5891,17 @@ indentation and initial hashes.  Behaves usually outside of comment."
 	  ;;    (defconst cperl-nonoverridable-face
 	  ;;	'cperl-nonoverridable-face
 	  ;;	"Face to use for data types from another group."))
-	  ;;(if (not (featurep 'xemacs)) nil
-	  ;;  (or (boundp 'font-lock-comment-face)
-	  ;;	(defconst font-lock-comment-face
-	  ;;	  'font-lock-comment-face
-	  ;;	  "Face to use for comments."))
-	  ;;  (or (boundp 'font-lock-keyword-face)
-	  ;;	(defconst font-lock-keyword-face
-	  ;;	  'font-lock-keyword-face
-	  ;;	  "Face to use for keywords."))
-	  ;;  (or (boundp 'font-lock-function-name-face)
-	  ;;	(defconst font-lock-function-name-face
-	  ;;	  'font-lock-function-name-face
-	  ;;	  "Face to use for function names.")))
 	  (if (and
-	       (not (cperl-is-face 'cperl-array-face))
-	       (cperl-is-face 'font-lock-emphasized-face))
+	       (not (facep 'cperl-array-face))
+	       (facep 'font-lock-emphasized-face))
 	      (copy-face 'font-lock-emphasized-face 'cperl-array-face))
 	  (if (and
-	       (not (cperl-is-face 'cperl-hash-face))
-	       (cperl-is-face 'font-lock-other-emphasized-face))
+	       (not (facep 'cperl-hash-face))
+	       (facep 'font-lock-other-emphasized-face))
 	      (copy-face 'font-lock-other-emphasized-face 'cperl-hash-face))
 	  (if (and
-	       (not (cperl-is-face 'cperl-nonoverridable-face))
-	       (cperl-is-face 'font-lock-other-type-face))
+	       (not (facep 'cperl-nonoverridable-face))
+	       (facep 'font-lock-other-type-face))
 	      (copy-face 'font-lock-other-type-face 'cperl-nonoverridable-face))
 	  ;;(or (boundp 'cperl-hash-face)
 	  ;;    (defconst cperl-hash-face
@@ -5960,21 +5911,11 @@ indentation and initial hashes.  Behaves usually outside of comment."
 	  ;;    (defconst cperl-array-face
 	  ;;	'cperl-array-face
 	  ;;	"Face to use for arrays."))
-	  ;; Here we try to guess background
-	  (let ((background
-		 (if (boundp 'font-lock-background-mode)
-		     font-lock-background-mode
-		   'light)))
-	    (defvar cperl-guessed-background
-	      (if (and (boundp 'font-lock-display-type)
-		       (eq font-lock-display-type 'grayscale))
-		  'gray
-		background)
-	      "Background as guessed by CPerl mode")
-	    (and (not (cperl-is-face 'font-lock-constant-face))
-		 (cperl-is-face 'font-lock-reference-face)
+	  (let ((background 'light))
+	    (and (not (facep 'font-lock-constant-face))
+		 (facep 'font-lock-reference-face)
 		 (copy-face 'font-lock-reference-face 'font-lock-constant-face))
-	    (if (cperl-is-face 'font-lock-type-face) nil
+	    (if (facep 'font-lock-type-face) nil
 	      (copy-face 'default 'font-lock-type-face)
 	      (cond
 	       ((eq background 'light)
@@ -5989,7 +5930,7 @@ indentation and initial hashes.  Behaves usually outside of comment."
 				       "pink")))
 	       (t
 		(set-face-background 'font-lock-type-face "gray90"))))
-	    (if (cperl-is-face 'cperl-nonoverridable-face)
+	    (if (facep 'cperl-nonoverridable-face)
 		nil
 	      (copy-face 'font-lock-type-face 'cperl-nonoverridable-face)
 	      (cond
@@ -6003,43 +5944,9 @@ indentation and initial hashes.  Behaves usually outside of comment."
 				     (if (x-color-defined-p "orchid1")
 					 "orchid1"
 				       "orange")))))
-	    ;; (if (cperl-is-face 'font-lock-other-emphasized-face) nil
-	    ;;   (copy-face 'bold-italic 'font-lock-other-emphasized-face)
-	    ;;   (cond
-	    ;;    ((eq background 'light)
-	    ;;     (set-face-background 'font-lock-other-emphasized-face
-	    ;;     		     (if (x-color-defined-p "lightyellow2")
-	    ;;     			 "lightyellow2"
-	    ;;     		       (if (x-color-defined-p "lightyellow")
-	    ;;     			   "lightyellow"
-	    ;;     			 "light yellow"))))
-	    ;;    ((eq background 'dark)
-	    ;;     (set-face-background 'font-lock-other-emphasized-face
-	    ;;     		     (if (x-color-defined-p "navy")
-	    ;;     			 "navy"
-	    ;;     		       (if (x-color-defined-p "darkgreen")
-	    ;;     			   "darkgreen"
-	    ;;     			 "dark green"))))
-	    ;;    (t (set-face-background 'font-lock-other-emphasized-face "gray90"))))
-	    ;; (if (cperl-is-face 'font-lock-emphasized-face) nil
-	    ;;   (copy-face 'bold 'font-lock-emphasized-face)
-	    ;;   (cond
-	    ;;    ((eq background 'light)
-	    ;;     (set-face-background 'font-lock-emphasized-face
-	    ;;     		     (if (x-color-defined-p "lightyellow2")
-	    ;;     			 "lightyellow2"
-	    ;;     		       "lightyellow")))
-	    ;;    ((eq background 'dark)
-	    ;;     (set-face-background 'font-lock-emphasized-face
-	    ;;     		     (if (x-color-defined-p "navy")
-	    ;;     			 "navy"
-	    ;;     		       (if (x-color-defined-p "darkgreen")
-	    ;;     			   "darkgreen"
-	    ;;     			 "dark green"))))
-	    ;;    (t (set-face-background 'font-lock-emphasized-face "gray90"))))
-	    (if (cperl-is-face 'font-lock-variable-name-face) nil
+	    (if (facep 'font-lock-variable-name-face) nil
 	      (copy-face 'italic 'font-lock-variable-name-face))
-	    (if (cperl-is-face 'font-lock-constant-face) nil
+	    (if (facep 'font-lock-constant-face) nil
 	      (copy-face 'italic 'font-lock-constant-face))))
 	(setq cperl-faces-init t))
     (error (message "cperl-init-faces (ignored): %s" errs))))
@@ -6400,8 +6307,6 @@ side-effect of memorizing only.  Examples in `cperl-style-examples'."
 	  (funcall (or (and (boundp 'find-tag-default-function)
 			    find-tag-default-function)
 		       (get major-mode 'find-tag-default-function)
-		       ;; XEmacs 19.12 has `find-tag-default-hook'; it is
-		       ;; automatically used within `find-tag-default':
 		       'find-tag-default))))))
 
 (defun cperl-info-on-command (command)
@@ -6992,7 +6897,7 @@ Use as
 		  file (file-of-tag)
 		  fileind (format "%s:%s" file line)
 		  ;; Moves to beginning of the next line:
-		  info (cperl-etags-snarf-tag file line))
+		  info (etags-snarf-tag))
 	    ;; Move back
 	    (forward-char -1)
 	    ;; Make new member of hierarchy name ==> file ==> pos if needed
@@ -7064,7 +6969,7 @@ One may build such TAGS files from CPerl mode menu."
   (if (vectorp update)
       (progn
 	(find-file (elt update 0))
-	(cperl-etags-goto-tag-location (elt update 1))))
+	(etags-goto-tag-location (elt update 1))))
   (if (eq update -999) (cperl-tags-hier-init t)))
 
 (defun cperl-tags-treeify (to level)

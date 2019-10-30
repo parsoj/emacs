@@ -3615,7 +3615,6 @@ extern void set_default_internal (Lisp_Object, Lisp_Object,
 extern Lisp_Object expt_integer (Lisp_Object, Lisp_Object);
 extern void syms_of_data (void);
 extern void swap_in_global_binding (struct Lisp_Symbol *);
-extern Lisp_Object integer_mod (Lisp_Object, Lisp_Object);
 
 /* Defined in cmds.c */
 extern void syms_of_cmds (void);
@@ -3825,9 +3824,10 @@ extern void mark_maybe_objects (Lisp_Object const *, ptrdiff_t);
 extern void mark_stack (char const *, char const *);
 extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
 extern void garbage_collect (void);
+extern void maybe_garbage_collect (void);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
-extern intmax_t consing_until_gc;
+extern EMACS_INT consing_until_gc;
 #ifdef HAVE_PDUMPER
 extern int number_finalizers_run;
 #endif
@@ -3862,28 +3862,27 @@ extern void visit_static_gc_roots (struct gc_root_visitor visitor);
 /* Build a frequently used 1/2/3/4-integer lists.  */
 
 INLINE Lisp_Object
-list1i (EMACS_INT x)
+list1i (intmax_t a)
 {
-  return list1 (make_fixnum (x));
+  return list1 (make_int (a));
 }
 
 INLINE Lisp_Object
-list2i (EMACS_INT x, EMACS_INT y)
+list2i (intmax_t a, intmax_t b)
 {
-  return list2 (make_fixnum (x), make_fixnum (y));
+  return list2 (make_int (a), make_int (b));
 }
 
 INLINE Lisp_Object
-list3i (EMACS_INT x, EMACS_INT y, EMACS_INT w)
+list3i (intmax_t a, intmax_t b, intmax_t c)
 {
-  return list3 (make_fixnum (x), make_fixnum (y), make_fixnum (w));
+  return list3 (make_int (a), make_int (b), make_int (c));
 }
 
 INLINE Lisp_Object
-list4i (EMACS_INT x, EMACS_INT y, EMACS_INT w, EMACS_INT h)
+list4i (intmax_t a, intmax_t b, intmax_t c, intmax_t d)
 {
-  return list4 (make_fixnum (x), make_fixnum (y),
-		make_fixnum (w), make_fixnum (h));
+  return list4 (make_int (a), make_int (b), make_int (c), make_int (d));
 }
 
 extern Lisp_Object make_uninit_bool_vector (EMACS_INT);
@@ -4309,12 +4308,14 @@ extern Lisp_Object write_region (Lisp_Object, Lisp_Object, Lisp_Object,
 extern void close_file_unwind (int);
 extern void fclose_unwind (void *);
 extern void restore_point_unwind (Lisp_Object);
+extern bool file_access_p (char const *, int);
 extern Lisp_Object get_file_errno_data (const char *, Lisp_Object, int);
 extern AVOID report_file_errno (const char *, Lisp_Object, int);
 extern AVOID report_file_error (const char *, Lisp_Object);
 extern AVOID report_file_notify_error (const char *, Lisp_Object);
+extern Lisp_Object file_attribute_errno (Lisp_Object, int);
 extern bool internal_delete_file (Lisp_Object);
-extern Lisp_Object emacs_readlinkat (int, const char *);
+extern Lisp_Object check_emacs_readlinkat (int, Lisp_Object, char const *);
 extern bool file_directory_p (Lisp_Object);
 extern bool file_accessible_directory_p (Lisp_Object);
 extern void init_fileio (void);
@@ -4389,6 +4390,7 @@ extern bool input_pending;
 extern sigjmp_buf return_to_command_loop;
 #endif
 extern Lisp_Object menu_bar_items (Lisp_Object);
+extern Lisp_Object tab_bar_items (Lisp_Object, int *);
 extern Lisp_Object tool_bar_items (Lisp_Object, int *);
 extern void discard_mouse_events (void);
 #ifdef USABLE_SIGIO
@@ -5024,7 +5026,7 @@ struct for_each_tail_internal
 
    Use Brent’s teleporting tortoise-hare algorithm.  See:
    Brent RP. BIT. 1980;20(2):176-84. doi:10.1007/BF01933190
-   http://maths-people.anu.edu.au/~brent/pd/rpb051i.pdf
+   https://maths-people.anu.edu.au/~brent/pd/rpb051i.pdf
 
    This macro uses maybe_quit because of an excess of caution.  The
    call to maybe_quit should not be needed in practice, as a very long
@@ -5056,7 +5058,7 @@ INLINE void
 maybe_gc (void)
 {
   if (consing_until_gc < 0)
-    garbage_collect ();
+    maybe_garbage_collect ();
 }
 
 INLINE_HEADER_END

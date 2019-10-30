@@ -318,7 +318,7 @@ want to set `Info-refill-paragraphs'."
 	 (set sym val)
 	 (dolist (buffer (buffer-list))
 	   (with-current-buffer buffer
-	     (when (eq major-mode 'Info-mode)
+             (when (derived-mode-p 'Info-mode)
 	       (revert-buffer t t)))))
   :group 'info)
 
@@ -4059,6 +4059,8 @@ If FORK is non-nil, it is passed to `Info-goto-node'."
     (define-key map [follow-link] 'mouse-face)
     (define-key map [XF86Back] 'Info-history-back)
     (define-key map [XF86Forward] 'Info-history-forward)
+    (define-key map [tool-bar C-Back\ in\ history] 'Info-history-back-menu)
+    (define-key map [tool-bar C-Forward\ in\ history] 'Info-history-forward-menu)
     map)
   "Keymap containing Info commands.")
 
@@ -4150,6 +4152,36 @@ If FORK is non-nil, it is passed to `Info-goto-node'."
     (tool-bar-local-item-from-menu 'quit-window "exit" map Info-mode-map
 				   :vert-only t)
     map))
+
+(defun Info-history-menu (e name history command)
+  (let* ((i (length history))
+         (map (make-sparse-keymap name)))
+    (mapc (lambda (history)
+            (let ((file (nth 0 history))
+                  (node (nth 1 history)))
+              (when (stringp file)
+                (setq file (file-name-sans-extension
+                            (file-name-nondirectory file))))
+              (define-key map (vector (intern (format "history-%i" i)))
+                `(menu-item ,(format "(%s) %s" file node)
+                            (lambda ()
+                              (interactive)
+                              (dotimes (_ ,i) (call-interactively ',command))))))
+            (setq i (1- i)))
+          (reverse history))
+    (let* ((selection (x-popup-menu e map))
+           (binding (and selection (lookup-key map (vector (car selection))))))
+      (if binding (call-interactively binding)))))
+
+(defun Info-history-back-menu (e)
+  "Pop up the menu with a list of previously visited Info nodes."
+  (interactive "e")
+  (Info-history-menu e "Back in history" Info-history 'Info-history-back))
+
+(defun Info-history-forward-menu (e)
+  "Pop up the menu with a list of Info nodes visited with ‘Info-history-back’."
+  (interactive "e")
+  (Info-history-menu e "Forward in history" Info-history-forward 'Info-history-forward))
 
 (defvar Info-menu-last-node nil)
 ;; Last node the menu was created for.
@@ -4265,6 +4297,33 @@ With a zero prefix arg, put the name inside a function call to `info'."
 (defvar Info-mode-font-lock-keywords
   '(("‘\\([‘’]\\|[^‘’]*\\)’" (1 'Info-quoted))))
 
+;; See info-utils.c:degrade_utf8 in Texinfo for the source of the list
+;; below.
+(defvar info-symbols-and-replacements
+  '((?\‘ . "`")
+    (?\’ . "'")
+    (?\“ . "\"")
+    (?\” . "\"")
+    (?© . "(C)")
+    (?\》 . ">>")
+    (?→ . "->")
+    (?⇒ . "=>")
+    (?⊣ . "-|")
+    (?★ . "-!-")
+    (?↦ . "==>")
+    (?‐ . "-")
+    (?‑ . "-")
+    (?‒ . "-")
+    (?– . "-")
+    (?— . "--")
+    (?− . "-")
+    (?… . "...")
+    (?• . "*")
+    )
+  "A list of Unicode symbols used in Info files and their ASCII translations.
+Each element should be a cons cell with its car a character and its cdr
+a string of ASCII characters.")
+
 ;; Autoload cookie needed by desktop.el
 ;;;###autoload
 (define-derived-mode Info-mode nil "Info" ;FIXME: Derive from special-mode?
@@ -4336,6 +4395,20 @@ Advanced commands:
   (setq case-fold-search t)
   (setq buffer-read-only t)
   (setq Info-tag-table-marker (make-marker))
+  (unless (or (display-multi-font-p)
+              (coding-system-equal
+               (coding-system-base (terminal-coding-system))
+               'utf-8))
+    (dolist (elt info-symbols-and-replacements)
+      (let ((ch (car elt))
+            (repl (cdr elt)))
+        (or (char-displayable-p ch)
+            (aset (or buffer-display-table
+                      (setq buffer-display-table (make-display-table)))
+                  ch (vconcat (mapcar (lambda (c)
+                                        (make-glyph-code c 'homoglyph))
+                                      repl)))))))
+
   (if Info-use-header-line    ; do not override global header lines
       (setq header-line-format
  	    '(:eval (get-text-property (point-min) 'header-line))))
@@ -5300,13 +5373,22 @@ completion alternatives to currently visited manuals."
 	found)
     (dolist (buffer blist)
       (with-current-buffer buffer
-	(when (and (eq major-mode 'Info-mode)
+        (when (and (derived-mode-p 'Info-mode)
 		   (stringp Info-current-file)
 		   (string-match manual-re Info-current-file))
 	  (setq found buffer
 		blist nil))))
     (if found
-	(switch-to-buffer found)
+        (let ((window (get-buffer-window found t)))
+          ;; If the buffer is already displayed in a window somewhere,
+          ;; then select that window (and pop its frame to the top).
+          (if window
+              (progn
+                (raise-frame (window-frame window))
+                (select-frame-set-input-focus (window-frame window))
+                (select-window window))
+	    (switch-to-buffer found)))
+      ;; The buffer doesn't exist; create it.
       (info-initialize)
       (info (Info-find-file manual)
 	    (generate-new-buffer-name "*info*")))))
@@ -5315,7 +5397,7 @@ completion alternatives to currently visited manuals."
   (let (names)
     (dolist (buffer (buffer-list))
       (with-current-buffer buffer
-	(and (eq major-mode 'Info-mode)
+        (and (derived-mode-p 'Info-mode)
 	     (stringp Info-current-file)
 	     (not (string= (substring (buffer-name) 0 1) " "))
 	     (push (file-name-sans-extension

@@ -185,9 +185,9 @@ If a character, new links are unconditionally marked with that character."
 
 (defcustom dired-dwim-target nil
   "If non-nil, Dired tries to guess a default target directory.
-This means: if there is a Dired buffer displayed in the next
-window, use its current directory, instead of this Dired buffer's
-current directory.
+This means: if there is a Dired buffer displayed in one of the most
+recently selected windows, use its current directory, instead of this
+Dired buffer's current directory.
 
 The target is used in the prompt for file copy, rename etc."
   :type 'boolean
@@ -431,6 +431,13 @@ Subexpression 2 must end right before the \\n.")
 (defvar dired-perm-write-face 'dired-perm-write
   "Face name used for permissions of group- and world-writable files.")
 
+(defface dired-set-id
+  '((((type w32 pc)) :inherit default)  ;; These default to rw-rw-rw.
+    (t (:inherit font-lock-warning-face)))
+  "Face used to highlight permissions of suid and guid files."
+  :group 'dired-faces
+  :version "27.1")
+
 (defface dired-directory
   '((t (:inherit font-lock-function-name-face)))
   "Face used for subdirectories."
@@ -499,6 +506,12 @@ Subexpression 2 must end right before the \\n.")
    (list (concat dired-re-maybe-mark dired-re-inode-size
 		 "[-d].......\\(w\\).")	; world writable
 	 '(1 dired-perm-write-face))
+   (list (concat dired-re-maybe-mark dired-re-inode-size
+		 "[-d]..\\(s\\)......")	; suid
+	 '(1 'dired-set-id))
+   (list (concat dired-re-maybe-mark dired-re-inode-size
+		 "[-d].....\\([sS]\\)...")	; guid
+	 '(1 'dired-set-id))
    ;;
    ;; Subdirectories.
    (list dired-re-dir
@@ -835,6 +848,13 @@ If DIRNAME is already in a Dired buffer, that buffer is used without refresh."
   (interactive (dired-read-dir-and-switches "in other frame "))
   (switch-to-buffer-other-frame (dired-noselect dirname switches)))
 
+;;;###autoload (define-key tab-prefix-map "d" 'dired-other-tab)
+;;;###autoload
+(defun dired-other-tab (dirname &optional switches)
+  "\"Edit\" directory DIRNAME.  Like `dired' but makes a new tab."
+  (interactive (dired-read-dir-and-switches "in other tab "))
+  (switch-to-buffer-other-tab (dired-noselect dirname switches)))
+
 ;;;###autoload
 (defun dired-noselect (dir-or-list &optional switches)
   "Like `dired' but returns the Dired buffer as value, does not select it."
@@ -893,12 +913,16 @@ This feature is used by Auto Revert mode."
 	 (dired-directory-changed-p dirname))))
 
 (defcustom dired-auto-revert-buffer nil
-  "Automatically revert Dired buffer on revisiting.
-If t, revisiting an existing Dired buffer automatically reverts it.
-If its value is a function, call this function with the directory
-name as single argument and revert the buffer if it returns non-nil.
-Otherwise, a message offering to revert the changed dired buffer
-is displayed.
+  "Automatically revert Dired buffers on revisiting their directory.
+This option controls whether to refresh the directory listing in a
+Dired buffer when the directory that is already in some Dired buffer
+is revisited by commands such as \\[dired] and \\[dired-find-file].
+If the value is t, revisiting an existing Dired buffer always reverts it.
+If the value is a function, it is called with the directory name as a
+single argument, and the buffer is reverted if the function returns non-nil.
+One such function is `dired-directory-changed-p', which returns non-nil
+if the directory has been changed since it was last revisited.
+Otherwise, Emacs prompts whether to revert the changed Dired buffer.
 Note that this is not the same as `auto-revert-mode' that
 periodically reverts at specified time intervals."
   :type '(choice
@@ -2575,7 +2599,13 @@ See options: `dired-hide-details-hide-symlink-targets' and
 ;; Returns position (point) or nil if no filename on this line."
 (defun dired-move-to-filename (&optional raise-error eol)
   "Move to the beginning of the filename on the current line.
-Return the position of the beginning of the filename, or nil if none found."
+Return the position of the beginning of the filename, or nil if none found.
+
+If RAISE-ERROR, signal an error if we can't find the filename on
+the current line.
+
+If EOL, it should be an position to use instead of
+`line-end-position' as the end of the line."
   ;; This is the UNIX version.
   (or eol (setq eol (line-end-position)))
   (beginning-of-line)
@@ -3406,7 +3436,8 @@ argument or confirmation)."
 	 (dired-format-columns-of-files
 	  (if (eq (car files) t) (cdr files) files))
 	 (remove-text-properties (point-min) (point-max)
-				 '(mouse-face nil help-echo nil)))))))
+				 '(mouse-face nil help-echo nil))
+	 (setq tab-line-exclude nil))))))
 
 (defun dired-format-columns-of-files (files)
   (let ((beg (point)))

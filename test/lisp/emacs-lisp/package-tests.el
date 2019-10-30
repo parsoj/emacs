@@ -28,7 +28,12 @@
 
 ;; Run this in a clean Emacs session using:
 ;;
-;;     $ emacs -Q --batch -L . -l package-test.el -l ert -f ert-run-tests-batch-and-exit
+;;     $ emacs -Q --batch -L . -l package-tests.el -l ert -f ert-run-tests-batch-and-exit
+;;
+;; From the top level directory of the Emacs development repository,
+;; you can use this instead:
+;;
+;;     $ make -C test package-tests
 
 ;;; Code:
 
@@ -360,6 +365,28 @@ Must called from within a `tar-mode' buffer."
       (should-not (re-search-forward "^\\s-+simple-single\\s-+1.3\\s-+\\(available\\|new\\)" nil t))
       (kill-buffer buf))))
 
+(ert-deftest package-test-list-filter-by-name ()
+  "Ensure package list is filtered correctly by package name."
+  (with-package-test ()
+    (let ((buf (package-list-packages)))
+      (package-menu-filter-by-name "tetris")
+      (goto-char (point-min))
+      (should (re-search-forward "^\\s-+tetris" nil t))
+      (should (= (count-lines (point-min) (point-max)) 1))
+      (kill-buffer buf))))
+
+(ert-deftest package-test-list-clear-filter ()
+  "Ensure package list filter is cleared correctly."
+  (with-package-test ()
+    (let ((buf (package-list-packages)))
+      (let ((num-packages (count-lines (point-min) (point-max))))
+        (should (> num-packages 1))
+        (package-menu-filter-by-name "tetris")
+        (should (= (count-lines (point-min) (point-max)) 1))
+        (package-menu-clear-filter)
+        (should (= (count-lines (point-min) (point-max)) num-packages)))
+      (kill-buffer buf))))
+
 (ert-deftest package-test-update-archives ()
   "Test updating package archives."
   (with-package-test ()
@@ -424,6 +451,16 @@ Must called from within a `tar-mode' buffer."
             (should
              (search-forward-regexp "^ +simple-single" nil t))))
       (if (process-live-p process) (kill-process process)))))
+
+(ert-deftest package-test-update-archives/ignore-nil-entry ()
+  "Ignore any packages that are nil.  Test for Bug#28502."
+  (with-package-test ()
+    (let* ((with-nil-entry (expand-file-name "package-resources/with-nil-entry"
+                                             package-test-file-dir))
+           (package-archives `(("with-nil-entry" . ,with-nil-entry))))
+      (package-initialize)
+      (package-refresh-contents)
+      (should (equal (length package-archive-contents) 2)))))
 
 (ert-deftest package-test-describe-package ()
   "Test displaying help for a package."
@@ -649,25 +686,16 @@ Must called from within a `tar-mode' buffer."
                  multi-file-desc
                  new-pkg-desc
                  simple-depend-desc-1
-                 simple-depend-desc-2))))
+                 simple-depend-desc-2)))
+        (pkg-cmp #'string-lessp))
     (should
-     (equal (package--get-deps 'simple-depend)
-            '(simple-single)))
+     (equal (sort (package--get-deps '(simple-depend)) pkg-cmp)
+            (sort (list 'simple-depend 'simple-single) pkg-cmp)))
     (should
-     (equal (package--get-deps 'simple-depend 'indirect)
-            nil))
-    (should
-     (equal (package--get-deps 'simple-depend 'direct)
-            '(simple-single)))
-    (should
-     (equal (package--get-deps 'simple-depend-2)
-            '(simple-depend-1 multi-file simple-depend simple-single)))
-    (should
-     (equal (package--get-deps 'simple-depend-2 'indirect)
-            '(simple-depend multi-file simple-single)))
-    (should
-     (equal (package--get-deps 'simple-depend-2 'direct)
-            '(simple-depend-1 multi-file)))))
+     (equal (sort (package--get-deps '(simple-depend-2)) pkg-cmp)
+            (sort (list 'simple-depend-2 'simple-depend-1 'multi-file
+                        'simple-depend 'simple-single)
+                  pkg-cmp)))))
 
 (ert-deftest package-test-sort-by-dependence ()
   "Test `package--sort-by-dependence' with complex structures."

@@ -74,7 +74,7 @@ The expanded value is cached."
 ;;;###autoload
 (defun reftex-bib-or-thebib ()
   "Test if BibTeX or \\begin{thebibliography} should be used for the citation.
-Find the bof of the current file"
+Find the bof of the current file."
   (let* ((docstruct (symbol-value reftex-docstruct-symbol))
          (rest (or (member (list 'bof (buffer-file-name)) docstruct)
                    docstruct))
@@ -763,7 +763,10 @@ in order to only add another reference in the same cite command."
       (setq format "%l"))
 
      ((and (stringp macro)
-           (string-match "\\`\\\\cite\\|cite\\'" macro))
+           ;; Match also commands from biblatex ending with `s'
+           ;; (\parencites) or `*' (\parencite*) and `texts?'
+           ;; (\footcitetext and \footcitetexts).
+           (string-match "\\`\\\\cite\\|cite\\([s*]\\|texts?\\)?\\'" macro))
       ;; We are already inside a cite macro
       (if (or (not arg) (not (listp arg)))
           (setq format

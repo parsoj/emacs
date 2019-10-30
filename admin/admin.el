@@ -147,6 +147,10 @@ Root must be the root of an Emacs source tree."
     (unless (> (length newversion) 2)   ; pretest or release candidate?
       (with-temp-buffer
         (insert-file-contents newsfile)
+        (when (re-search-forward "^\\* [^\n]*\n+" nil t)
+          (display-warning 'admin
+                           "NEWS file contains empty sections - remove them?"))
+        (goto-char (point-min))
         (if (re-search-forward "^\\(\\+\\+\\+ *\\|--- *\\)$" nil t)
             (display-warning 'admin
                              "NEWS file still contains temporary markup.
@@ -333,7 +337,7 @@ Optional argument TYPE is type of output (nil means all)."
 
 (defconst manual-doctype-string
   "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\"
-\"http://www.w3.org/TR/html4/loose.dtd\">\n\n")
+\"https://www.w3.org/TR/html4/loose.dtd\">\n\n")
 
 (defconst manual-meta-string
   "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">

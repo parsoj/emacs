@@ -563,9 +563,9 @@ See variable `server-auth-dir' for details."
                      (format "it is not owned by you (owner = %s (%d))"
                              (user-full-name uid) uid))
                     (w32 nil)           ; on NTFS?
-                    ((/= 0 (logand ?\077 (file-modes dir)))
-                     (format "it is accessible by others (%03o)"
-                             (file-modes dir)))
+                    ((let ((modes (file-modes dir)))
+                       (unless (zerop (logand (or modes 0) #o077))
+                         (format "it is accessible by others (%03o)" modes))))
                     (t nil))))
       (when unsafe
         (error "`%s' is not a safe directory because %s"
@@ -926,12 +926,11 @@ This handles splitting the command if it would be bigger than
             (isearch-cancel))))
     ;; Signaled by isearch-cancel.
     (quit (message nil)))
-  (when (> (recursion-depth) 0)
+  (when (> (minibuffer-depth) 0)
     ;; We're inside a minibuffer already, so if the emacs-client is trying
     ;; to open a frame on a new display, we might end up with an unusable
     ;; frame because input from that display will be blocked (until exiting
     ;; the minibuffer).  Better exit this minibuffer right away.
-    ;; Similarly with recursive-edits such as the splash screen.
     (run-with-timer 0 nil (lambda () (server-execute-continuation proc)))
     (top-level)))
 

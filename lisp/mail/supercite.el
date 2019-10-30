@@ -1461,7 +1461,7 @@ First runs `sc-pre-recite-hook'."
 ;; building headers
 
 (defun sc-hdr (prefix field &optional sep return-nil-p)
-  "Returns a concatenation of PREFIX and FIELD.
+  "Return a concatenation of PREFIX and FIELD.
 If FIELD is not a string or is the empty string, the empty string will
 be returned.  Optional third argument SEP is concatenated on the end if
 it is a string.  Returns empty string, unless optional RETURN-NIL-P is
@@ -1589,7 +1589,7 @@ Treats these fields in a similar manner to `sc-header-on-said'."
   "Current electric reference style.")
 
 (defun sc-valid-index-p (index)
-  "Returns INDEX if it is a valid index into `sc-rewrite-header-list'.
+  "Return INDEX if it is a valid index into `sc-rewrite-header-list'.
 Otherwise returns nil."
     ;; a number, and greater than or equal to zero
     ;; less than or equal to the last index
@@ -1753,7 +1753,7 @@ entered, regardless of the value of `sc-electric-references-p'.  See
 
 (defun sc-raw-mode-toggle ()
   "Toggle, in one fell swoop, two important SC variables:
-`sc-fixup-whitespace-p' and `sc-auto-fill-region-p'"
+`sc-fixup-whitespace-p' and `sc-auto-fill-region-p'."
   (interactive)
   (setq sc-fixup-whitespace-p (not sc-fixup-whitespace-p)
 	sc-auto-fill-region-p (not sc-auto-fill-region-p))

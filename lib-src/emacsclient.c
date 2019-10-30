@@ -700,11 +700,7 @@ fail (void)
 {
   if (alternate_editor)
     {
-      /* If the user has said --eval, then those aren't file name
-	 parameters, so don't put them on the alternate_editor command
-	 line. */
-      size_t extra_args_size =
-	(eval? 0: (main_argc - optind + 1) * sizeof (char *));
+      size_t extra_args_size = (main_argc - optind + 1) * sizeof (char *);
       size_t new_argv_size = extra_args_size;
       char **new_argv = xmalloc (new_argv_size);
       char *s = xstrdup (alternate_editor);
@@ -914,22 +910,38 @@ initialize_sockets (void)
 #endif /* WINDOWSNT */
 
 
-/* If the home directory is HOME, return the configuration file with
-   basename CONFIG_FILE.  Fail if there is no home directory or if the
-   configuration file could not be opened.  */
+/* If the home directory is HOME, and XDG_CONFIG_HOME's value is XDG,
+   return the configuration file with basename CONFIG_FILE.  Fail if
+   the configuration file could not be opened.  */
 
 static FILE *
-open_config (char const *home, char const *config_file)
+open_config (char const *home, char const *xdg, char const *config_file)
 {
-  if (!home)
-    return NULL;
-  ptrdiff_t homelen = strlen (home);
-  static char const emacs_d_server[] = "/.emacs.d/server/";
-  ptrdiff_t suffixsize = sizeof emacs_d_server + strlen (config_file);
-  char *configname = xmalloc (homelen + suffixsize);
-  strcpy (stpcpy (stpcpy (configname, home), emacs_d_server), config_file);
+  ptrdiff_t xdgsubdirsize = xdg ? strlen (xdg) + sizeof "/emacs/server/" : 0;
+  ptrdiff_t homesuffixsizemax = max (sizeof "/.config/emacs/server/",
+				     sizeof "/.emacs.d/server/");
+  ptrdiff_t homesubdirsizemax = home ? strlen (home) + homesuffixsizemax : 0;
+  char *configname = xmalloc (max (xdgsubdirsize, homesubdirsizemax)
+			      + strlen (config_file));
+  FILE *config;
+  if (xdg || home)
+    {
+      strcpy ((xdg
+	       ? stpcpy (stpcpy (configname, xdg), "/emacs/server/")
+	       : stpcpy (stpcpy (configname, home), "/.config/emacs/server/")),
+	      config_file);
+      config = fopen (configname, "rb");
+    }
+  else
+    config = NULL;
 
-  FILE *config = fopen (configname, "rb");
+  if (! config && home)
+    {
+      strcpy (stpcpy (stpcpy (configname, home), "/.emacs.d/server/"),
+	      config_file);
+      config = fopen (configname, "rb");
+    }
+
   free (configname);
   return config;
 }
@@ -949,10 +961,11 @@ get_server_config (const char *config_file, struct sockaddr_in *server,
     config = fopen (config_file, "rb");
   else
     {
-      config = open_config (egetenv ("HOME"), config_file);
+      char const *xdg = egetenv ("XDG_CONFIG_HOME");
+      config = open_config (egetenv ("HOME"), xdg, config_file);
 #ifdef WINDOWSNT
       if (!config)
-	config = open_config (egetenv ("APPDATA"), config_file);
+	config = open_config (egetenv ("APPDATA"), xdg, config_file);
 #endif
     }
 

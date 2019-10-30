@@ -290,6 +290,7 @@ DEF_DLL_FN (const char *, gnutls_ext_get_name, (unsigned int));
 #   endif
 #  endif	 /* HAVE_GNUTLS3 */
 
+static gnutls_free_function *gnutls_free_func;
 
 static bool
 init_gnutls_functions (void)
@@ -428,6 +429,13 @@ init_gnutls_functions (void)
 #   endif
 #  endif	 /* HAVE_GNUTLS3 */
 
+  /* gnutls_free is a variable inside GnuTLS, whose value is the
+     "free" function.  So it needs special handling.  */
+  gnutls_free_func = (gnutls_free_function *) GetProcAddress (library,
+							      "gnutls_free");
+  if (!gnutls_free_func)
+    return false;
+
   max_log_level = clip_to_bounds (INT_MIN, global_gnutls_log_level, INT_MAX);
   {
     Lisp_Object name = CAR_SAFE (Fget (Qgnutls, QCloaded_from));
@@ -559,6 +567,11 @@ init_gnutls_functions (void)
 #   endif
 #  endif	 /* HAVE_GNUTLS3 */
 
+/* gnutls_free_func is a data pointer to a variable which holds an
+   address of a function.  We use #undef because MinGW64 defines
+   gnutls_free as a macro as well in the GnuTLS headers.  */
+#  undef gnutls_free
+#  define gnutls_free (*gnutls_free_func)
 
 /* This wrapper is called from fns.c, which doesn't know about the
    LOAD_DLL_FN stuff above.  */
@@ -881,7 +894,7 @@ emacs_gnutls_handle_error (gnutls_session_t session, int err)
 }
 
 /* convert an integer error to a Lisp_Object; it will be either a
-   known symbol like `gnutls_e_interrupted' and `gnutls_e_again' or
+   known symbol like 'gnutls_e_interrupted' and 'gnutls_e_again' or
    simply the integer value of the error.  GNUTLS_E_SUCCESS is mapped
    to Qt.  */
 static Lisp_Object
@@ -1474,10 +1487,10 @@ returned as the :certificate entry.  */)
 				  (gnutls_kx_get (state)))));
 
   /* Protocol name. */
+  gnutls_protocol_t proto = gnutls_protocol_get_version (state);
   result = nconc2
     (result, list2 (intern (":protocol"),
-		    build_string (gnutls_protocol_get_name
-				  (gnutls_protocol_get_version (state)))));
+		    build_string (gnutls_protocol_get_name (proto))));
 
   /* Cipher name. */
   result = nconc2
@@ -1507,15 +1520,16 @@ returned as the :certificate entry.  */)
 #endif
 
   /* Renegotiation Indication */
-  result = nconc2
-    (result, list2 (intern (":safe-renegotiation"),
-                    gnutls_safe_renegotiation_status (state) ? Qt : Qnil));
+  if (proto <= GNUTLS_TLS1_2)
+    result = nconc2
+      (result, list2 (intern (":safe-renegotiation"),
+		      gnutls_safe_renegotiation_status (state) ? Qt : Qnil));
 
   return result;
 }
 
 /* Initialize global GnuTLS state to defaults.
-   Call `gnutls-global-deinit' when GnuTLS usage is no longer needed.
+   Call 'gnutls-global-deinit' when GnuTLS usage is no longer needed.
    Return zero on success.  */
 Lisp_Object
 emacs_gnutls_global_init (void)
@@ -1546,7 +1560,7 @@ gnutls_ip_address_p (char *string)
 
 # if 0
 /* Deinitialize global GnuTLS state.
-   See also `gnutls-global-init'.  */
+   See also 'gnutls-global-init'.  */
 static Lisp_Object
 emacs_gnutls_global_deinit (void)
 {
@@ -1609,15 +1623,10 @@ string representation.  */)
 	     emacs_gnutls_strerror (err));
     }
 
-  char *out_buf = xmalloc ((out.size + 1) * sizeof (char));
-  memset (out_buf, 0, (out.size + 1) * sizeof (char));
-  memcpy (out_buf, out.data, out.size);
-
-  xfree (out.data);
+  Lisp_Object result = make_string_from_bytes ((char *) out.data, out.size,
+					       out.size);
+  gnutls_free (out.data);
   gnutls_x509_crt_deinit (crt);
-
-  Lisp_Object result = build_string (out_buf);
-  xfree (out_buf);
 
   return result;
 }
@@ -2461,11 +2470,10 @@ The KEY can be specified as a buffer or string or in other ways (see
 Info node `(elisp)Format of GnuTLS Cryptography Inputs').  The KEY
 will be wiped after use if it's a string.
 
-The IV and INPUT and the optional AEAD_AUTH can be specified as a
-buffer or string or in other ways (see Info node `(elisp)Format of
-GnuTLS Cryptography Inputs').
+The IV and INPUT and the optional AEAD_AUTH can also be specified as a
+buffer or string or in other ways.
 
-The alist of symmetric ciphers can be obtained with `gnutls-ciphers`.
+The alist of symmetric ciphers can be obtained with `gnutls-ciphers'.
 The CIPHER may be a string or symbol matching a key in that alist, or
 a plist with the :cipher-id numeric property, or the number itself.
 
@@ -2488,11 +2496,10 @@ The KEY can be specified as a buffer or string or in other ways (see
 Info node `(elisp)Format of GnuTLS Cryptography Inputs').  The KEY
 will be wiped after use if it's a string.
 
-The IV and INPUT and the optional AEAD_AUTH can be specified as a
-buffer or string or in other ways (see Info node `(elisp)Format of
-GnuTLS Cryptography Inputs').
+The IV and INPUT and the optional AEAD_AUTH can also be specified as a
+buffer or string or in other ways.
 
-The alist of symmetric ciphers can be obtained with `gnutls-ciphers`.
+The alist of symmetric ciphers can be obtained with `gnutls-ciphers'.
 The CIPHER may be a string or symbol matching a key in that alist, or
 a plist with the `:cipher-id' numeric property, or the number itself.
 
@@ -2583,10 +2590,10 @@ The KEY can be specified as a buffer or string or in other ways (see
 Info node `(elisp)Format of GnuTLS Cryptography Inputs').  The KEY
 will be wiped after use if it's a string.
 
-The INPUT can be specified as a buffer or string or in other
-ways (see Info node `(elisp)Format of GnuTLS Cryptography Inputs').
+The INPUT can also be specified as a buffer or string or in other
+ways.
 
-The alist of MAC algorithms can be obtained with `gnutls-macs`.  The
+The alist of MAC algorithms can be obtained with `gnutls-macs'.  The
 HASH-METHOD may be a string or symbol matching a key in that alist, or
 a plist with the `:mac-algorithm-id' numeric property, or the number
 itself. */)
@@ -2681,7 +2688,7 @@ Return nil on error.
 The INPUT can be specified as a buffer or string or in other
 ways (see Info node `(elisp)Format of GnuTLS Cryptography Inputs').
 
-The alist of digest algorithms can be obtained with `gnutls-digests`.
+The alist of digest algorithms can be obtained with `gnutls-digests'.
 The DIGEST-METHOD may be a string or symbol matching a key in that
 alist, or a plist with the `:digest-algorithm-id' numeric property, or
 the number itself. */)

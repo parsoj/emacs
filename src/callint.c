@@ -35,7 +35,6 @@ static Lisp_Object point_marker;
 /* String for the prompt text used in Fcall_interactively.  */
 static Lisp_Object callint_message;
 
-/* ARGSUSED */
 DEFUN ("interactive", Finteractive, Sinteractive, 0, UNEVALLED, 0,
        doc: /* Specify a way of parsing arguments for interactive use of a function.
 For example, write
@@ -799,7 +798,7 @@ Its numeric meaning is what you would get from `(interactive "p")'.  */)
   else if (EQ (raw, Qminus))
     XSETINT (val, -1);
   else if (CONSP (raw) && FIXNUMP (XCAR (raw)))
-    XSETINT (val, XFIXNUM (XCAR (raw)));
+    val = XCAR (raw);
   else if (FIXNUMP (raw))
     val = raw;
   else

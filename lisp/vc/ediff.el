@@ -79,8 +79,7 @@
 ;;  1. The undo command doesn't restore deleted regions well.  That is, if
 ;;  you delete all characters in a difference region and then invoke
 ;;  `undo', the reinstated text will most likely be inserted outside of
-;;  what Ediff thinks is the current difference region. (This problem
-;;  doesn't seem to exist with XEmacs.)
+;;  what Ediff thinks is the current difference region.
 ;;
 ;;  If at any point you feel that difference regions are no longer correct,
 ;;  you can hit '!' to recompute the differences.
@@ -1541,9 +1540,7 @@ arguments after setting up the Ediff buffers."
   "Return string describing the version of Ediff.
 When called interactively, displays the version."
   (interactive)
-  (if (if (featurep 'xemacs)
-          (interactive-p)
-        (called-interactively-p 'interactive))
+  (if (called-interactively-p 'interactive)
       (message "%s" (ediff-version))
     (format "Ediff %s" ediff-version)))
 
@@ -1562,7 +1559,7 @@ With optional NODE, goes to that node."
     (condition-case nil
 	(progn
 	  (pop-to-buffer (get-buffer-create "*info*"))
-	  (info (if (featurep 'xemacs) "ediff.info" "ediff"))
+	  (info "ediff")
 	  (if node
 	      (Info-goto-node node)
 	    (message "Type `i' to search for a specific topic"))

@@ -261,7 +261,7 @@ but has not been processed yet.")
   "Non-nil when we're currently processing a message.
 
 When ERC receives a private message, it sets up a new buffer for
-this query.  These in turn, though, do start flyspell. This
+this query.  These in turn, though, do start flyspell.  This
 involves starting an external process, in which case Emacs will
 wait - and when it waits, it does accept other stuff from, say,
 network exceptions.  So, if someone sends you two messages
@@ -320,7 +320,7 @@ If a key is pressed while ERC is waiting, it will stop waiting."
   "The maximum length of a single message.
 If a message exceeds this size, it is broken into multiple ones.
 
-IRC allows for lines up to 512 bytes. Two of them are CR LF.
+IRC allows for lines up to 512 bytes.  Two of them are CR LF.
 And a typical message looks like this:
 
   :nicky!uhuser@host212223.dialin.fnordisp.net PRIVMSG #lazybastards :Hello!
@@ -347,8 +347,8 @@ This will only be consulted if the coding system in
 This is either a coding system, a cons, a function, or nil.
 
 If a cons, the encoding system for outgoing text is in the car
-and the decoding system for incoming text is in the cdr. The most
-interesting use for this is to put `undecided' in the cdr. This
+and the decoding system for incoming text is in the cdr.  The most
+interesting use for this is to put `undecided' in the cdr.  This
 means that `erc-coding-system-precedence' will be consulted, and the
 first match there will be used.
 
@@ -481,13 +481,13 @@ Currently this is called by `erc-send-input'."
       (split-string (buffer-string) "\n"))))
 
 (defun erc-forward-word ()
-  "Moves forward one word, ignoring any subword settings.  If no
-subword-mode is active, then this is (forward-word)."
+  "Move forward one word, ignoring any subword settings.
+If no subword-mode is active, then this is (forward-word)."
   (skip-syntax-forward "^w")
   (> (skip-syntax-forward "w") 0))
 
 (defun erc-word-at-arg-p (pos)
-  "Reports whether the char after a given POS has word syntax.
+  "Report whether the char after a given POS has word syntax.
 If POS is out of range, the value is nil."
   (let ((c (char-after pos)))
     (if c
@@ -495,9 +495,9 @@ If POS is out of range, the value is nil."
       nil)))
 
 (defun erc-bounds-of-word-at-point ()
-  "Returns the bounds of a word at point, or nil if we're not at
-a word.  If no subword-mode is active, then this
-is (bounds-of-thing-at-point 'word)."
+  "Return the bounds of word at point, or nil if we're not at a word.
+If no subword-mode is active, then this is
+\(bounds-of-thing-at-point 'word)."
   (if (or (erc-word-at-arg-p (point))
           (erc-word-at-arg-p (1- (point))))
       (save-excursion
@@ -596,7 +596,7 @@ We will store server variables in the buffer given by BUFFER."
       (erc-login)) ))
 
 (defun erc-server-reconnect ()
-"Reestablish the current IRC connection.
+  "Reestablish the current IRC connection.
 Make sure you are in an ERC buffer when running this."
   (let ((buffer (erc-server-buffer)))
     (unless (buffer-live-p buffer)
@@ -765,8 +765,8 @@ This is determined via `erc-encoding-coding-alist' or
 
 (defun erc-decode-string-from-target (str target)
   "Decode STR as appropriate for TARGET.
-This is indicated by `erc-encoding-coding-alist', defaulting to the value of
-`erc-server-coding-system'."
+This is indicated by `erc-encoding-coding-alist', defaulting to the
+value of `erc-server-coding-system'."
   (unless (stringp str)
     (setq str ""))
   (let ((coding (erc-coding-system-for-target target)))
@@ -795,7 +795,7 @@ Use DISPLAY-FN to show the results."
 (defun erc-server-send (string &optional forcep target)
   "Send STRING to the current server.
 If FORCEP is non-nil, no flood protection is done - the string is
-sent directly. This might cause the messages to arrive in a wrong
+sent directly.  This might cause the messages to arrive in a wrong
 order.
 
 If TARGET is specified, look up encoding information for that
@@ -903,7 +903,7 @@ protection algorithm."
   "Send LINE to the server as a privmsg or a notice.
 MESSAGE-COMMAND should be either \"PRIVMSG\" or \"NOTICE\".
 If the target is \",\", the last person you've got a message from will
-be used. If the target is \".\", the last person you've sent a message
+be used.  If the target is \".\", the last person you've sent a message
 to will be used."
   (cond
    ((string-match "^\\s-*\\(\\S-+\\) ?\\(.*\\)" line)
@@ -1118,7 +1118,8 @@ NAME is the response name as sent by the server (see the IRC RFC for
 meanings).
 
 This creates:
- - a hook variable `erc-server-NAME-functions' initialized to `erc-server-NAME'.
+ - a hook variable `erc-server-NAME-functions' initialized to
+   `erc-server-NAME'.
  - a function `erc-server-NAME' with body FN-BODY.
 
 If ALIASES is non-nil, each alias in ALIASES is `defalias'ed to
@@ -2075,6 +2076,3 @@ See `erc-display-error-notice'." nil
 (provide 'erc-backend)
 
 ;;; erc-backend.el ends here
-;; Local Variables:
-;; indent-tabs-mode: nil
-;; End:

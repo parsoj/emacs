@@ -804,7 +804,7 @@ also be set with the OPTIONS keyword, e.g. \"timestamp:nil\"."
   :safe #'booleanp)
 
 (defcustom org-export-with-timestamps t
-  "Non nil means allow timestamps in export.
+  "Non-nil means allow timestamps in export.
 
 It can be set to any of the following values:
   t          export all timestamps.
@@ -4711,7 +4711,7 @@ code."
 
 ;;;; For Tables
 ;;
-;; `org-export-table-has-special-column-p' and and
+;; `org-export-table-has-special-column-p' and
 ;; `org-export-table-row-is-special-p' are predicates used to look for
 ;; meta-information about the table structure.
 ;;

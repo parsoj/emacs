@@ -365,9 +365,17 @@ List has a form of (file-name full-file-name (attribute-list))."
 ;;;###autoload
 (defun dired-do-chmod (&optional arg)
   "Change the mode of the marked (or next ARG) files.
-Symbolic modes like `g+w' are allowed.
-Type M-n to pull the file attributes of the file at point
-into the minibuffer."
+Both octal numeric modes like `644' and symbolic modes like `g+w'
+are supported.  Type M-n to pull the file attributes of the file
+at point into the minibuffer.
+
+See Info node `(coreutils)File permissions' for more information.
+Alternatively, see the man page for \"chmod\", using the command
+\\[man] in Emacs.
+
+Note that on MS-Windows only the `w' (write) bit is meaningful:
+resetting it makes the file read-only.  Changing any other bit
+has no effect on MS-Windows."
   (interactive "P")
   (let* ((files (dired-get-marked-files t arg nil nil t))
 	 ;; The source of default file attributes is the file at point.
@@ -735,7 +743,11 @@ instead of in a subdir.
 
 In a noninteractive call (from Lisp code), you must specify
 the list of file names explicitly with the FILE-LIST argument, which
-can be produced by `dired-get-marked-files', for example."
+can be produced by `dired-get-marked-files', for example.
+
+`dired-guess-shell-alist-default' and
+`dired-guess-shell-alist-user' are consulted when the user is
+prompted for the shell command to use interactively."
 ;;Functions dired-run-shell-command and dired-shell-stuff-it do the
 ;;actual work and can be redefined for customization.
   (interactive
@@ -1609,7 +1621,7 @@ If `ask', ask for user confirmation."
     (if (and recursive
 	     (eq t (file-attribute-type attrs))
 	     (or (eq recursive 'always)
-		 (yes-or-no-p (format "Recursive copies of %s? " from))))
+		 (yes-or-no-p (format "Copy %s recursively? " from))))
 	(copy-directory from to preserve-time)
       (or top (dired-handle-overwrite to))
       (condition-case err
@@ -1965,6 +1977,18 @@ Optional arg HOW-TO determines how to treat the target.
    #'read-file-name
    (format prompt (dired-mark-prompt arg files)) dir default))
 
+(defun dired-dwim-target-directories ()
+  ;; Return directories from all visible windows with dired-mode buffers
+  ;; ordered by most-recently-used.
+  (mapcar #'cdr (sort (mapcan (lambda (w)
+                                (with-current-buffer (window-buffer w)
+                                  (when (eq major-mode 'dired-mode)
+                                    (list (cons (window-use-time w)
+                                                (dired-current-directory))))))
+                              (delq (selected-window)
+                                    (window-list-1 nil 'nomini 'visible)))
+                      (lambda (a b) (> (car a) (car b))))))
+
 (defun dired-dwim-target-directory ()
   ;; Try to guess which target directory the user may want.
   ;; If there is a dired buffer displayed in one of the next windows,
@@ -1973,15 +1997,7 @@ Optional arg HOW-TO determines how to treat the target.
 		       (dired-current-directory))))
     ;; non-dired buffer may want to profit from this function, e.g. vm-uudecode
     (if dired-dwim-target
-	(let* ((other-win (get-window-with-predicate
-			   (lambda (window)
-			     (with-current-buffer (window-buffer window)
-			       (eq major-mode 'dired-mode)))))
-	       (other-dir (and other-win
-			       (with-current-buffer (window-buffer other-win)
-				 (and (eq major-mode 'dired-mode)
-				      (dired-current-directory))))))
-	  (or other-dir this-dir))
+	(or (car (dired-dwim-target-directories)) this-dir)
       this-dir)))
 
 (defun dired-dwim-target-defaults (fn-list target-dir)
@@ -1999,15 +2015,11 @@ Optional arg HOW-TO determines how to treat the target.
 	 (and (consp fn-list) (null (cdr fn-list)) (car fn-list)))
 	(current-dir (and (eq major-mode 'dired-mode)
 			  (dired-current-directory)))
-	dired-dirs)
-    ;; Get a list of directories of visible buffers in dired-mode.
-    (walk-windows (lambda (w)
-		    (with-current-buffer (window-buffer w)
-		      (and (eq major-mode 'dired-mode)
-			   (push (dired-current-directory) dired-dirs)))))
+	;; Get a list of directories of visible buffers in dired-mode.
+	(dired-dirs (dired-dwim-target-directories)))
     ;; Force the current dir to be the first in the list.
     (setq dired-dirs
-	  (delete-dups (delq nil (cons current-dir (nreverse dired-dirs)))))
+	  (delete-dups (delq nil (cons current-dir dired-dirs))))
     ;; Remove the target dir (if specified) or the current dir from
     ;; default values, because it should be already in initial input.
     (setq dired-dirs (delete (or target-dir current-dir) dired-dirs))

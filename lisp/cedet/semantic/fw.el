@@ -62,9 +62,7 @@
   "Extract the window from EVENT."
   (car (car (cdr event))))
 
-(defalias 'semantic-make-local-hook
-  (if (featurep 'emacs)
-      #'identity  #'make-local-hook))
+(define-obsolete-function-alias 'semantic-make-local-hook #'identity "27.1")
 
 (defalias 'semantic-mode-line-update #'force-mode-line-update)
 
@@ -188,8 +186,8 @@ Mark OLDFNALIAS as obsolete, such that the byte compiler
 will throw a warning when it encounters this symbol."
   (defalias oldfnalias newfn)
   (make-obsolete oldfnalias newfn when)
-  (when (and (function-overload-p newfn)
-             (not (overload-obsoleted-by newfn))
+  (when (and (mode-local--function-overload-p newfn)
+             (not (mode-local--overload-obsoleted-by newfn))
              ;; Only throw this warning when byte compiling things.
              (boundp 'byte-compile-current-file)
              byte-compile-current-file
@@ -263,7 +261,7 @@ FUNCTION does not have arguments.  When FUNCTION is entered
 (semantic-alias-obsolete 'define-mode-overload-implementation
                          'define-mode-local-override "23.2")
 
-(defun semantic-install-function-overrides (overrides &optional transient mode)
+(defun semantic-install-function-overrides (overrides &optional transient)
   "Install the function OVERRIDES in the specified environment.
 OVERRIDES must be an alist ((OVERLOAD .  FUNCTION) ...) where OVERLOAD
 is a symbol identifying an overloadable entry, and FUNCTION is the
@@ -284,8 +282,7 @@ later installation should be done in MODE hook."
             (cons (intern (format "semantic-%s" name)) (cdr e)))))
     overrides)
    (list 'constant-flag (not transient)
-         'override-flag t)
-   mode))
+         'override-flag t)))
 
 ;;; User Interrupt handling
 ;;
@@ -329,7 +326,7 @@ calling this one."
 (defun semantic-find-file-noselect (file &optional nowarn rawfile wildcards)
   "Call `find-file-noselect' with various features turned off.
 Use this when referencing a file that will be soon deleted.
-FILE, NOWARN, RAWFILE, and WILDCARDS are passed into `find-file-noselect'"
+FILE, NOWARN, RAWFILE, and WILDCARDS are passed into `find-file-noselect'."
   ;; Hack -
   ;; Check if we are in set-auto-mode, and if so, warn about this.
   (when (boundp 'keep-mode-if-same)

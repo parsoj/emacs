@@ -364,7 +364,7 @@ either an error is raised or not."
 
 (defun mml-secure-message-sign (&optional method)
   "Add MML tags to sign the entire message.
-Use METHOD if given. Else use `mml-secure-method' or
+Use METHOD if given.  Else use `mml-secure-method' or
 `mml-default-sign-method'."
   (interactive)
   (mml-secure-message
@@ -373,7 +373,7 @@ Use METHOD if given. Else use `mml-secure-method' or
 
 (defun mml-secure-message-sign-encrypt (&optional method)
   "Add MML tag to sign and encrypt the entire message.
-Use METHOD if given. Else use `mml-secure-method' or
+Use METHOD if given.  Else use `mml-secure-method' or
 `mml-default-sign-method'."
   (interactive)
   (mml-secure-message
@@ -382,7 +382,7 @@ Use METHOD if given. Else use `mml-secure-method' or
 
 (defun mml-secure-message-encrypt (&optional method)
   "Add MML tag to encrypt the entire message.
-Use METHOD if given. Else use `mml-secure-method' or
+Use METHOD if given.  Else use `mml-secure-method' or
 `mml-default-sign-method'."
   (interactive)
   (mml-secure-message
@@ -660,8 +660,9 @@ The passphrase is read and cached."
     (catch 'break
       (dolist (uid uids nil)
 	(if (and (stringp (epg-user-id-string uid))
-                 (car (mail-header-parse-address
-                       (epg-user-id-string uid)))
+                 (car (ignore-errors
+			(mail-header-parse-address
+			 (epg-user-id-string uid))))
 		 (equal (downcase (car (mail-header-parse-address
 					(epg-user-id-string uid))))
 			(downcase (car (mail-header-parse-address
@@ -915,7 +916,7 @@ If no one is selected, symmetric encryption will be performed.  "
     (when sign
       (setq signers (mml-secure-signers context signer-names))
       (setf (epg-context-signers context) signers)
-      (when mml-secure-openpgp-sign-with-sender
+      (when (and (eq 'OpenPGP protocol) mml-secure-openpgp-sign-with-sender)
         (setf (epg-context-sender context) sender)))
     (when (eq 'OpenPGP protocol)
       (setf (epg-context-armor context) t)
@@ -943,12 +944,14 @@ If no one is selected, symmetric encryption will be performed.  "
 	 (signer-names (mml-secure-signer-names protocol sender))
 	 (signers (mml-secure-signers context signer-names))
 	 signature micalg)
+    (unless signers
+      (error "Couldn't find any signer names.  Perhaps `mml-secure-smime-sign-with-sender' should be set?"))
     (when (eq 'OpenPGP protocol)
       (setf (epg-context-armor context) t)
-      (setf (epg-context-textmode context) t))
+      (setf (epg-context-textmode context) t)
+      (when mml-secure-openpgp-sign-with-sender
+        (setf (epg-context-sender context) sender)))
     (setf (epg-context-signers context) signers)
-    (when mml-secure-openpgp-sign-with-sender
-      (setf (epg-context-sender context) sender))
     (when (mml-secure-cache-passphrase-p protocol)
       (epg-context-set-passphrase-callback
        context

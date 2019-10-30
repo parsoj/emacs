@@ -558,7 +558,7 @@ of the list is of the form (USER . CHANNEL-DATA), where USER is
 an erc-server-user struct, and CHANNEL-DATA is either nil or an
 erc-channel-user struct.
 
-See also: `erc-sort-channel-users-by-activity'"
+See also: `erc-sort-channel-users-by-activity'."
   (let (users)
     (if (hash-table-p erc-channel-users)
         (maphash (lambda (_nick cdata)
@@ -739,7 +739,7 @@ See also: `erc-echo-notice-always-hook',
 `erc-echo-notice-in-active-buffer',
 `erc-echo-notice-in-user-buffers',
 `erc-echo-notice-in-user-and-target-buffers',
-`erc-echo-notice-in-first-user-buffer'"
+`erc-echo-notice-in-first-user-buffer'."
   :group 'erc-hooks
   :type 'hook
   :options '(erc-echo-notice-in-default-buffer
@@ -770,7 +770,7 @@ See also: `erc-echo-notice-hook',
 `erc-echo-notice-in-active-buffer',
 `erc-echo-notice-in-user-buffers',
 `erc-echo-notice-in-user-and-target-buffers',
-`erc-echo-notice-in-first-user-buffer'"
+`erc-echo-notice-in-first-user-buffer'."
   :group 'erc-hooks
   :type 'hook
   :options '(erc-echo-notice-in-default-buffer
@@ -1096,6 +1096,14 @@ At this point, all modifications from prior hook functions are done."
   :options '(erc-truncate-buffer
              erc-make-read-only
              erc-save-buffer-in-logs))
+
+(defcustom erc-insert-done-hook nil
+  "This hook is called after inserting strings into the buffer.
+This hook is not called from inside `save-excursion' and should
+preserve point if needed."
+  :group 'erc-hooks
+  :version "27.1"
+  :type 'hook)
 
 (defcustom erc-send-modify-hook nil
   "Sending hook for functions that will change the text's appearance.
@@ -2419,6 +2427,7 @@ If STRING is nil, the function does nothing."
                   (when erc-remove-parsed-property
                     (remove-text-properties (point-min) (point-max)
                                             '(erc-parsed nil))))))))
+        (run-hooks 'erc-insert-done-hook)
         (erc-update-undo-list (- (or (marker-position erc-insert-marker)
                                      (point-max))
                                  insert-position))))))
@@ -2594,6 +2603,8 @@ every `erc-lurker-cleanup-interval' updates to
 consumption of lurker state during long Emacs sessions and/or ERC
 sessions with large numbers of incoming PRIVMSGs.")
 
+(defvar erc-message-parsed)
+
 (defun erc-lurker-update-status (_message)
   "Update `erc-lurker-state' if necessary.
 
@@ -2603,18 +2614,20 @@ reflect the fact that its sender has issued a PRIVMSG at the
 current time.  Otherwise, take no action.
 
 This function depends on the fact that `erc-display-message'
-dynamically binds `parsed', which is used to check if the current
-message is a PRIVMSG and to determine its sender.  See also
-`erc-lurker-trim-nicks' and `erc-lurker-ignore-chars'.
+dynamically binds `erc-message-parsed', which is used to check if
+the current message is a PRIVMSG and to determine its sender.
+See also `erc-lurker-trim-nicks' and `erc-lurker-ignore-chars'.
 
 In order to limit memory consumption, this function also calls
 `erc-lurker-cleanup' once every `erc-lurker-cleanup-interval'
 updates of `erc-lurker-state'."
-  (when (and (boundp 'parsed) (erc-response-p parsed))
-    (let* ((command (erc-response.command parsed))
+  (when (and (boundp 'erc-message-parsed)
+             (erc-response-p erc-message-parsed))
+    (let* ((command (erc-response.command erc-message-parsed))
            (sender
             (erc-lurker-maybe-trim
-             (car (erc-parse-user (erc-response.sender parsed)))))
+             (car (erc-parse-user
+                   (erc-response.sender erc-message-parsed)))))
            (server
             (erc-canonicalize-server-name erc-server-announced-name)))
       (when (equal command "PRIVMSG")
@@ -2680,7 +2693,7 @@ is a member of `erc-lurker-hide-list' are hidden if `erc-lurker-p'
 returns non-nil."
   (let* ((command (erc-response.command parsed))
          (sender (car (erc-parse-user (erc-response.sender parsed))))
-         (channel (nth 1 (erc-response.command-args parsed)))
+         (channel (car (erc-response.command-args parsed)))
          (network (or (and (fboundp 'erc-network-name) (erc-network-name))
 		      (erc-shorten-server-name
 		       (or erc-server-announced-name
@@ -2689,9 +2702,9 @@ returns non-nil."
 	  (when erc-network-hide-list
 	    (erc-add-targets network erc-network-hide-list)))
 	 (current-hide-list
-	  (apply 'append current-hide-list
-		 (when erc-channel-hide-list
-		   (erc-add-targets channel erc-channel-hide-list)))))
+	  (append current-hide-list
+		  (when erc-channel-hide-list
+		    (erc-add-targets channel erc-channel-hide-list)))))
     (or (member command erc-hide-list)
         (member command current-hide-list)
         (and (member command erc-lurker-hide-list) (erc-lurker-p sender)))))
@@ -2704,7 +2717,8 @@ ARGS, PARSED, and TYPE are used to format MSG sensibly.
 See also `erc-format-message' and `erc-display-line'."
   (let ((string (if (symbolp msg)
                     (apply #'erc-format-message msg args)
-                  msg)))
+                  msg))
+        (erc-message-parsed parsed))
     (setq string
           (cond
            ((null type)
@@ -2934,7 +2948,8 @@ If no USER argument is specified, list the contents of `erc-ignore-list'."
 
 (defun erc-cmd-CLEAR ()
   "Clear the window content."
-  (recenter 0)
+  (let ((inhibit-read-only t))
+    (delete-region (point-min) (line-beginning-position)))
   t)
 (put 'erc-cmd-CLEAR 'process-not-needed t)
 
@@ -4189,7 +4204,7 @@ Only happens when the session buffer isn't visible."
 Specifically in relation to NICK (user@host) information.  Returns REASON
 unmodified if nothing can be removed.
 E.g. \"Read error to Nick [user@some.host]: 110\" would be shortened to
-\"Read error: 110\". The same applies for \"Ping Timeout\"."
+\"Read error: 110\".  The same applies for \"Ping Timeout\"."
   (setq nick (regexp-quote nick)
         login (regexp-quote login)
         host (regexp-quote host))
@@ -4332,7 +4347,7 @@ See also `erc-format-nick-function'."
 
 (defun erc-format-@nick (&optional user _channel-data)
   "Format the nickname of USER showing if USER has a voice, is an
-operator, half-op, admin or owner. Owners have \"~\", admins have
+operator, half-op, admin or owner.  Owners have \"~\", admins have
 \"&\", operators have \"@\" and users with voice have \"+\" as a
 prefix.  Use CHANNEL-DATA to determine op and voice status.  See
 also `erc-format-nick-function'."
@@ -6849,6 +6864,4 @@ Otherwise, connect to HOST:PORT as USER and /join CHANNEL."
 ;;
 ;; Local Variables:
 ;; outline-regexp: ";;+"
-;; indent-tabs-mode: t
-;; tab-width: 8
 ;; End:

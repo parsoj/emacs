@@ -1,4 +1,4 @@
-;;; nsm.el --- Network Security Manager
+;;; nsm.el --- Network Security Manager  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
 
@@ -55,7 +55,6 @@ compatibility concerns.
 See the Emacs manual for a description of all things that are
 checked and warned against."
   :version "25.1"
-  :group 'nsm
   :type '(choice (const :tag "Low" low)
                  (const :tag "Medium" medium)
                  (const :tag "High" high)
@@ -76,7 +75,6 @@ connecting to hosts on a local network.
 Make sure you know what you are doing before enabling this
 option."
   :version "27.1"
-  :group 'nsm
   :type '(choice (const :tag "On" t)
                  (const :tag "Off" nil)
                  (function :tag "Custom function")))
@@ -85,7 +83,6 @@ option."
 						 user-emacs-directory)
   "The file the security manager settings will be stored in."
   :version "25.1"
-  :group 'nsm
   :type 'file)
 
 (defcustom nsm-save-host-names nil
@@ -93,7 +90,6 @@ option."
 By default, only hosts that have exceptions have their names
 stored in plain text."
   :version "25.1"
-  :group 'nsm
   :type 'boolean)
 
 (defvar nsm-noninteractive nil
@@ -175,8 +171,7 @@ otherwise.
 See also: `nsm-check-tls-connection', `nsm-save-host-names',
 `nsm-settings-file'"
   :version "27.1"
-  :group 'nsm
-  :type '(repeat (cons (function :tag "Check function")
+  :type '(repeat (list (symbol :tag "Check function")
                        (choice :tag "Level"
                                :value medium
                                (const :tag "Low" low)
@@ -184,7 +179,7 @@ See also: `nsm-check-tls-connection', `nsm-save-host-names',
                                (const :tag "High" high)))))
 
 (defun nsm-save-fingerprint-maybe (host port status &rest _)
-  "Saves the certificate's fingerprint.
+  "Save the certificate's fingerprint.
 
 In order to detect man-in-the-middle attacks, when
 `network-security-level' is `high', this function will save the
@@ -204,7 +199,7 @@ RESULTS is an alist where the keys are the checks run and the
 values the results of the checks.")
 
 (defun nsm-network-same-subnet (local-ip mask ip)
-  "Returns t if IP is in the same subnet as LOCAL-IP/MASK.
+  "Return t if IP is in the same subnet as LOCAL-IP/MASK.
 LOCAL-IP, MASK, and IP are specified as vectors of integers, and
 are expected to have the same length.  Works for both IPv4 and
 IPv6 addresses."
@@ -222,7 +217,7 @@ IPv6 addresses."
     matches))
 
 (defun nsm-should-check (host)
-  "Determines whether NSM should check for TLS problems for HOST.
+  "Determine whether NSM should check for TLS problems for HOST.
 
 If `nsm-trust-local-network' is or returns non-nil, and if the
 host address is a localhost address, or in the same subnet as one
@@ -274,7 +269,7 @@ See also: `network-security-protocol-checks' and `nsm-noninteractive'"
     (let* ((results
             (cl-loop
              for check in network-security-protocol-checks
-             for type = (intern (format ":%s" (car check)) obarray)
+             for type = (intern (format ":%s" (car check)))
              ;; Skip the check if the user has already said that this
              ;; host is OK for this type of "error".
              for result = (and (not (memq type
@@ -283,8 +278,7 @@ See also: `network-security-protocol-checks' and `nsm-noninteractive'"
                                    (nsm-level (cadr check)))
                                (funcall
                                 (intern (format "nsm-protocol-check--%s"
-                                                (car check))
-                                        obarray)
+                                                (car check)))
                                 host port status settings))
              when result
              collect (cons type result)))
@@ -326,7 +320,7 @@ See also: `network-security-protocol-checks' and `nsm-noninteractive'"
 (declare-function gnutls-peer-status-warning-describe "gnutls.c"
                   (status-symbol))
 
-(defun nsm-protocol-check--verify-cert (host port status settings)
+(defun nsm-protocol-check--verify-cert (_host _port status settings)
   "Check for warnings from the certificate verification status.
 
 This is the most basic security check for a TLS connection.  If
@@ -337,7 +331,7 @@ This is the most basic security check for a TLS connection.  If
          (not (nsm-warnings-ok-p status settings))
          (mapconcat #'gnutls-peer-status-warning-describe warnings "\n"))))
 
-(defun nsm-protocol-check--same-cert (host port status settings)
+(defun nsm-protocol-check--same-cert (_host _port status settings)
   "Check for certificate fingerprint mismatch.
 
 If the fingerprints saved do not match the fingerprint of the
@@ -349,7 +343,7 @@ man-in-the-middle attack."
 
 ;; Key exchange checks
 
-(defun nsm-protocol-check--rsa-kx (host port status &optional settings)
+(defun nsm-protocol-check--rsa-kx (_host _port status &optional _settings)
   "Check for static RSA key exchange.
 
 Static RSA key exchange methods do not offer perfect forward
@@ -379,7 +373,7 @@ Security (DTLS)\", \"(4.1.  General Guidelines)\"
           "RSA key exchange method (%s) does not offer perfect forward secrecy"
           kx))))
 
-(defun nsm-protocol-check--dhe-prime-kx (host port status &optional settings)
+(defun nsm-protocol-check--dhe-prime-kx (_host _port status &optional _settings)
   "Check for the key strength of DH key exchange based on integer factorization.
 
 This check is a response to Logjam[1].  Logjam is an attack that
@@ -410,7 +404,7 @@ Diffie-Hellman Fails in Practice\", `https://weakdh.org/'
          "Diffie-Hellman key strength (%s bits) too weak (%s bits)"
          prime-bits 1024))))
 
-(defun nsm-protocol-check--dhe-kx (host port status &optional settings)
+(defun nsm-protocol-check--dhe-kx (_host _port status &optional _settings)
   "Check for existence of DH key exchange based on integer factorization.
 
 In the years since the discovery of Logjam, it was discovered
@@ -434,7 +428,7 @@ Diffie-Hellman Backdoors in TLS.\",
        "unable to verify Diffie-Hellman key exchange method (%s) parameters"
        kx))))
 
-(defun nsm-protocol-check--export-kx (host port status &optional settings)
+(defun nsm-protocol-check--export-kx (_host _port status &optional _settings)
   "Check for RSA-EXPORT key exchange.
 
 EXPORT cipher suites are a family of 40-bit and 56-bit effective
@@ -459,7 +453,7 @@ of user-visible changes.\" Version 3.4.0,
             "EXPORT level key exchange (%s) is insecure"
             kx)))))
 
-(defun nsm-protocol-check--anon-kx (host port status &optional settings)
+(defun nsm-protocol-check--anon-kx (_host _port status &optional _settings)
   "Check for anonymous key exchange.
 
 Anonymous key exchange exposes the connection to
@@ -478,7 +472,7 @@ authentication\",
 
 ;; Cipher checks
 
-(defun nsm-protocol-check--cbc-cipher (host port status &optional settings)
+(defun nsm-protocol-check--cbc-cipher (_host _port status &optional _settings)
   "Check for CBC mode ciphers.
 
 CBC mode cipher in TLS versions earlier than 1.3 are problematic
@@ -507,7 +501,7 @@ Security (TLS) and Datagram Transport Layer Security (DTLS)\",
             "CBC mode cipher (%s) can be insecure"
             cipher)))))
 
-(defun nsm-protocol-check--ecdsa-cbc-cipher (host port status &optional settings)
+(defun nsm-protocol-check--ecdsa-cbc-cipher (_host _port status &optional _settings)
   "Check for CBC mode cipher usage under ECDSA key exchange.
 
 CBC mode cipher in TLS versions earlier than 1.3 are problematic
@@ -545,7 +539,7 @@ Security (TLS) and Datagram Transport Layer Security (DTLS)\",
             "CBC mode cipher (%s) can be insecure"
             cipher)))))
 
-(defun nsm-protocol-check--3des-cipher (host port status &optional settings)
+(defun nsm-protocol-check--3des-cipher (_host _port status &optional _settings)
   "Check for 3DES ciphers.
 
 Due to its use of 64-bit block size, it is known that a
@@ -566,7 +560,7 @@ Current Use and Deprecation of TDEA\",
           "3DES cipher (%s) is weak"
           cipher))))
 
-(defun nsm-protocol-check--rc4-cipher (host port status &optional settings)
+(defun nsm-protocol-check--rc4-cipher (_host _port status &optional _settings)
   "Check for RC4 ciphers.
 
 RC4 cipher has been prohibited by RFC 7465[1].
@@ -590,7 +584,7 @@ Reference:
 
 ;; Signature checks
 
-(defun nsm-protocol-check--sha1-sig (host port status &optional settings)
+(defun nsm-protocol-check--sha1-sig (_host _port status &optional _settings)
   "Check for SHA1 signatures on certificates.
 
 The first SHA1 collision was found in 2017[1], as a precaution
@@ -625,7 +619,7 @@ SHA-1 for SSL/TLS Certificates in Microsoft Edge and Internet Explorer
                    algo)
            end))
 
-(defun nsm-protocol-check--md5-sig (host port status &optional settings)
+(defun nsm-protocol-check--md5-sig (_host _port status &optional _settings)
   "Check for MD5 signatures on certificates.
 
 In 2008, a group of researchers were able to forge an
@@ -658,28 +652,30 @@ the MD5 Message-Digest and the HMAC-MD5 Algorithms\",
 
 ;; Extension checks
 
-(defun nsm-protocol-check--renegotiation-info-ext (host port status
-                                                  &optional settings)
+(defun nsm-protocol-check--renegotiation-info-ext (_host _port status
+                                                  &optional _settings)
   "Check for renegotiation_info TLS extension status.
 
 If this TLS extension is not used, the connection established is
 vulnerable to an attack in which an impersonator can extract
 sensitive information such as HTTP session ID cookies or login
-passwords.
+passwords.  Renegotiation was removed in TLS1.3, so this is only
+checked for earlier protocol versions.
 
 Reference:
 
 E. Rescorla, M. Ray, S. Dispensa, N. Oskov (Feb 2010).  \"Transport
 Layer Security (TLS) Renegotiation Indication Extension\",
 `https://tools.ietf.org/html/rfc5746'"
-  (let ((unsafe-renegotiation (not (plist-get status :safe-renegotiation))))
-    (and unsafe-renegotiation
-         (format-message
-          "safe renegotiation is not supported, connection not protected from impersonators"))))
+  (when (plist-member status :safe-renegotiation)
+    (let ((unsafe-renegotiation (not (plist-get status :safe-renegotiation))))
+      (and unsafe-renegotiation
+           (format-message
+            "safe renegotiation is not supported, connection not protected from impersonators")))))
 
 ;; Compression checks
 
-(defun nsm-protocol-check--compression (host port status &optional settings)
+(defun nsm-protocol-check--compression (_host _port status &optional _settings)
   "Check for TLS compression.
 
 TLS compression attacks such as CRIME would allow an attacker to
@@ -700,7 +696,7 @@ Security (DTLS)\", `https://tools.ietf.org/html/rfc7525'"
 
 ;; Protocol version checks
 
-(defun nsm-protocol-check--version (host port status &optional settings)
+(defun nsm-protocol-check--version (_host _port status &optional _settings)
   "Check for SSL/TLS protocol version.
 
 This function guards against the usage of SSL3.0, which has been
@@ -725,7 +721,7 @@ Early TLS\"
 
 ;; Full suite checks
 
-(defun nsm-protocol-check--null-suite (host port status &optional settings)
+(defun nsm-protocol-check--null-suite (_host _port status &optional _settings)
   "Check for NULL cipher suites.
 
 This function checks for NULL key exchange, cipher and message
@@ -793,8 +789,7 @@ protocol."
     (let ((response
 	   (condition-case nil
                (intern
-                (car (split-string (nsm-query-user message status)))
-                obarray)
+                (car (split-string (nsm-query-user message status))))
 	     ;; Make sure we manage to close the process if the user hits
 	     ;; `C-g'.
 	     (quit 'no)
@@ -810,97 +805,118 @@ protocol."
         (nsm-save-host host port status what problems response)
         t))))
 
-(set-advertised-calling-convention
- 'nsm-query '(host port status what problems message) "27.1")
-
 (declare-function gnutls-format-certificate "gnutls.c" (cert))
 
 (defun nsm-query-user (message status)
   (let ((buffer (get-buffer-create "*Network Security Manager*"))
         (cert-buffer (get-buffer-create "*Certificate Details*"))
-        (certs (plist-get status :certificates)))
+        (certs (plist-get status :certificates))
+        (accept-choices
+         '((?a "always" "Accept this certificate this session and for all future sessions.")
+           (?s "session only" "Accept this certificate this session only.")
+           (?n "no" "Refuse to use this certificate, and close the connection.")
+           (?d "details" "See certificate details")))
+        (details-choices
+         '((?b "backward page" "See previous page")
+           (?f "forward page" "See next page")
+           (?n "next" "Next certificate")
+           (?p "previous" "Previous certificate")
+           (?q "quit" "Quit details view")))
+        (done nil))
     (save-window-excursion
       ;; First format the certificate and warnings.
-      (with-current-buffer-window
-       buffer nil nil
-       (insert (nsm-format-certificate status))
-       (insert message)
-       (goto-char (point-min))
-       ;; Fill the first line of the message, which usually
-       ;; contains lots of explanatory text.
-       (fill-region (point) (line-end-position)))
+      (pop-to-buffer buffer)
+      (erase-buffer)
+      (let ((inhibit-read-only t))
+        (when status
+          (insert (nsm-format-certificate status)))
+        (insert message)
+        (goto-char (point-min))
+        ;; Fill the first line of the message, which usually
+        ;; contains lots of explanatory text.
+        (fill-region (point) (line-end-position))
+        ;; If the window is too small, add navigation options.
+        (when (> (line-number-at-pos (point-max)) (window-height))
+          (setq accept-choices
+                (append accept-choices
+                        '((?b "backward page" "See previous page")
+                          (?f "forward page" "See next page"))))))
       ;; Then ask the user what to do about it.
       (unwind-protect
-          (let* ((accept-choices '((?a "always" "Accept this certificate this session and for all future sessions.")
-                                   (?s "session only" "Accept this certificate this session only.")
-                                   (?n "no" "Refuse to use this certificate, and close the connection.")
-                                   (?d "details" "See certificate details")))
-                 (details-choices '((?b "backward page" "See previous page")
-                                    (?f "forward page" "See next page")
-                                    (?n "next" "Next certificate")
-                                    (?p "previous" "Previous certificate")
-                                    (?q "quit" "Quit details view")))
-                 (answer (read-multiple-choice "Continue connecting?"
-                                               accept-choices))
-                 (show-details (char-equal (car answer) ?d))
-                 (pems (cl-loop for cert in certs
+          (let* ((pems (cl-loop for cert in certs
                                 collect (gnutls-format-certificate
                                          (plist-get cert :pem))))
-                 (cert-index 0))
-            (while show-details
-              (unless (get-buffer-window cert-buffer)
-                (set-window-buffer (get-buffer-window buffer) cert-buffer)
-                (with-current-buffer cert-buffer
-                  (read-only-mode -1)
-                  (insert (nth cert-index pems))
-                  (goto-char (point-min))
-                  (read-only-mode)))
+                 (cert-index 0)
+                 show-details answer buf)
+            (while (not done)
+              (setq answer (if show-details
+                               (read-multiple-choice "Viewing certificate:"
+                                                     details-choices)
+                             (read-multiple-choice "Continue connecting?"
+                                                   accept-choices)))
+              (setq buf (if show-details cert-buffer buffer))
 
-              (setq answer (read-multiple-choice "Viewing certificate:" details-choices))
+              (cl-case (car answer)
+                (?q
+                 ;; Exit the details window.
+                 (set-window-buffer (get-buffer-window cert-buffer) buffer)
+                 (setq show-details nil))
 
-              (cond
-               ((char-equal (car answer) ?q)
-                (setq show-details (not show-details))
-                (set-window-buffer (get-buffer-window cert-buffer) buffer)
-                (setq show-details (char-equal
-                                    (car (setq answer
-                                               (read-multiple-choice
-                                                "Continue connecting?"
-                                                accept-choices)))
-                                    ?d)))
+                (?d
+                 ;; Enter the details window.
+                 (set-window-buffer (get-buffer-window buffer) cert-buffer)
+                 (with-current-buffer cert-buffer
+                   (read-only-mode -1)
+                   (insert (nth cert-index pems))
+                   (goto-char (point-min))
+                   (read-only-mode))
+                 (setq show-details t))
 
-               ((char-equal (car answer) ?b)
-                (with-selected-window (get-buffer-window cert-buffer)
-                  (with-current-buffer cert-buffer
-                    (ignore-errors (scroll-down)))))
+                (?b
+                 ;; Scroll down.
+                 (with-selected-window (get-buffer-window buf)
+                   (with-current-buffer buf
+                     (ignore-errors (scroll-down)))))
 
-               ((char-equal (car answer) ?f)
-                (with-selected-window (get-buffer-window cert-buffer)
-                  (with-current-buffer cert-buffer
-                    (ignore-errors (scroll-up)))))
+                (?f
+                 ;; Scroll up.
+                 (with-selected-window (get-buffer-window buf)
+                   (with-current-buffer buf
+                     (ignore-errors (scroll-up)))))
 
-               ((char-equal (car answer) ?n)
-                (with-current-buffer cert-buffer
-                  (read-only-mode -1)
-                  (erase-buffer)
-                  (setq cert-index (mod (1+ cert-index) (length pems)))
-                  (insert (nth cert-index pems))
-                  (goto-char (point-min))
-                  (read-only-mode)))
+                (?n
+                 ;; "No" or "next certificate".
+                 (if show-details
+                     (with-current-buffer cert-buffer
+                       (read-only-mode -1)
+                       (erase-buffer)
+                       (setq cert-index (mod (1+ cert-index) (length pems)))
+                       (insert (nth cert-index pems))
+                       (goto-char (point-min))
+                       (read-only-mode))
+                   (setq done t)))
 
-               ((char-equal (car answer) ?p)
-                (with-current-buffer cert-buffer
-                  (read-only-mode -1)
-                  (erase-buffer)
-                  (setq cert-index (mod (1- cert-index) (length pems)))
-                  (insert (nth cert-index pems))
-                  (goto-char (point-min))
-                  (read-only-mode)))))
+                (?a
+                 ;; "Always"
+                 (setq done t))
+
+                (?s
+                 ;; "Session only"
+                 (setq done t))
+
+                (?p
+                 ;; Previous certificate.
+                 (with-current-buffer cert-buffer
+                   (read-only-mode -1)
+                   (erase-buffer)
+                   (setq cert-index (mod (1- cert-index) (length pems)))
+                   (insert (nth cert-index pems))
+                   (goto-char (point-min))
+                   (read-only-mode)))))
+            ;; Return the answer.
             (cadr answer))
         (kill-buffer cert-buffer)
         (kill-buffer buffer)))))
-
-(set-advertised-calling-convention 'nsm-query-user '(message status) "27.1")
 
 (defun nsm-save-host (host port status what problems permanency)
   (let* ((id (nsm-id host port))
@@ -940,11 +956,6 @@ protocol."
 	  (nsm-write-settings))
       (nsm-remove-temporary-setting id)
       (push saved nsm-temporary-host-settings))))
-
-(set-advertised-calling-convention
- 'nsm-save-host
- '(host port status what problems permanency)
- "27.1")
 
 (defun nsm-write-settings ()
   (with-temp-file nsm-settings-file

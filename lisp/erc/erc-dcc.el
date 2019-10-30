@@ -88,13 +88,13 @@ All values of the list must be uppercase strings.")
    (:nick \"nick\" :type SEND :peer server-proc :parent parent-proc :file
    file :sent <marker> :confirmed <marker>))
 
- :nick - a user or userhost for the peer. combine with :parent to reach them
+ :nick - a user or userhost for the peer.  Combine with :parent to reach them
 
  :type - the type of DCC connection - SEND for outgoing files, GET for
-         incoming, and CHAT for both directions. To tell which end started
+         incoming, and CHAT for both directions.  To tell which end started
          the DCC chat, look at :peer
 
- :peer - the other end of the DCC connection. In the case of outgoing DCCs,
+ :peer - the other end of the DCC connection.  In the case of outgoing DCCs,
          this represents a server process until a connection is established
 
  :parent - the server process where the dcc connection was established.
@@ -102,7 +102,7 @@ All values of the list must be uppercase strings.")
            connection is in general independent from a particular server
            connection after it was established.
 
- :file - for outgoing sends, the full path to the file. for incoming sends,
+ :file - for outgoing sends, the full path to the file.  For incoming sends,
          the suggested filename or vetted filename
 
  :size - size of the file, may be nil on incoming DCCs")
@@ -163,11 +163,11 @@ All values of the list must be uppercase strings.")
 
 (defun erc-dcc-member (&rest args)
   "Return the first matching entry in `erc-dcc-list' which satisfies the
-constraints given as a plist in ARGS. Returns nil on no match.
+constraints given as a plist in ARGS.  Returns nil on no match.
 
 The property :nick is treated specially, if it contains a `!' character,
 it is treated as a nick!user@host string, and compared with the :nick property
-value of the individual elements using string-equal. Otherwise it is
+value of the individual elements using string-equal.  Otherwise it is
 compared with `erc-nick-equal-p' which is IRC case-insensitive."
   (let ((list erc-dcc-list)
         result test)
@@ -309,7 +309,7 @@ Should be set to a string or nil.  If nil, use the value of
   :type '(choice (const ask) (const auto) (const ignore)))
 
 (defun erc-dcc-get-host (proc)
-  "Returns the local IP address used for an open PROCess."
+  "Return the local IP address used for an open process PROC."
   (format-network-address (process-contact proc :local) t))
 
 (defun erc-dcc-host ()
@@ -338,8 +338,8 @@ string \".*!.*@.*\" to this list."
   :type '(repeat regexp))
 
 (defun erc-dcc-server (name filter sentinel)
-  "Start listening on a port for an incoming DCC connection. Returns the newly
-created subprocess, or nil."
+  "Start listening on a port for an incoming DCC connection.
+Returns the newly created subprocess, or nil."
   (let ((port (or (and erc-dcc-port-range (car erc-dcc-port-range)) t))
         (upper (and erc-dcc-port-range (cdr erc-dcc-port-range)))
         process)
@@ -413,7 +413,7 @@ where FOO is one of CLOSE, GET, SEND, LIST, CHAT, etc."
 
 ;;;###autoload
 (defun pcomplete/erc-mode/DCC ()
-  "Provides completion for the /DCC command."
+  "Provide completion for the /DCC command."
   (pcomplete-here (append '("chat" "close" "get" "list")
                           (when (fboundp 'make-network-process) '("send"))))
   (pcomplete-here
@@ -685,9 +685,10 @@ It extracts the information about the dcc request and adds it to
        ?n nick ?u login ?h host ?q query)))))
 
 (defun erc-dcc-auto-mask-p (spec)
-  "Takes a full SPEC of a user in the form \"nick!login@host\" and
-matches against all the regexp's in `erc-dcc-auto-masks'. If any
-match, returns that regexp and nil otherwise."
+  "Match SPEC against `erc-dcc-auto-masks'.
+SPEC is a full spec of a user in the form \"nick!login@host\", which
+is matched against all the regexps in `erc-dcc-auto-masks'.  Return
+the matching regexp, or nil if none found."
   (let ((lst erc-dcc-auto-masks))
     (while (and lst
                 (not (string-match (car lst) spec)))
@@ -907,9 +908,9 @@ other client."
 (make-variable-buffer-local 'erc-dcc-file-name)
 
 (defun erc-dcc-get-file (entry file parent-proc)
-  "This function does the work of setting up a transfer from the remote client
-to the local one over a tcp connection. This involves setting up a process
-filter and a process sentinel, and making the connection."
+  "Set up a transfer from the remote client to the local over a TCP connection.
+This involves setting up a process filter and a process sentinel,
+and making the connection."
   (let* ((buffer (generate-new-buffer (file-name-nondirectory file)))
          proc)
     (with-current-buffer buffer
@@ -1156,7 +1157,7 @@ other client."
     buffer))
 
 (defun erc-dcc-chat-accept (entry parent-proc)
-  "Accept an incoming DCC connection and open a DCC window"
+  "Accept an incoming DCC connection and open a DCC window."
   (let* ((nick (erc-extract-nick (plist-get entry :nick)))
          buffer proc)
     (setq proc
@@ -1245,5 +1246,4 @@ other client."
 ;;
 ;; Local Variables:
 ;; generated-autoload-file: "erc-loaddefs.el"
-;; indent-tabs-mode: nil
 ;; End:

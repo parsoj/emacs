@@ -165,6 +165,13 @@ attempt."
   :type '(choice regexp (const :tag "None" nil))
   :version "27.1")
 
+(defcustom smtpmail-retries 10
+  "The number of times smtpmail will retry sending when getting transient errors.
+These are errors with a code of 4xx from the SMTP server, which
+mean \"try again\"."
+  :type 'integer
+  :version "27.1")
+
 ;; End of customizable variables.
 
 
@@ -347,7 +354,8 @@ for `smtpmail-try-auth-method'.")
 		  (when (setq result
 			      (smtpmail-via-smtp
 			       smtpmail-recipient-address-list tembuf))
-		    (error "Sending failed: %s" result))
+		    (error "Sending failed: %s"
+                           (smtpmail--sanitize-error-message result)))
 		(error "Sending failed; no recipients"))
 	    (let* ((file-data
 		    (expand-file-name
@@ -430,12 +438,17 @@ for `smtpmail-try-auth-method'.")
                 (when (setq result (smtpmail-via-smtp
 				    smtpmail-recipient-address-list
 				    (current-buffer)))
-		  (error "Sending failed: %s" result))
+		  (error "Sending failed: %s"
+                         (smtpmail--sanitize-error-message result)))
               (error "Sending failed; no recipients"))))
 	(delete-file file-data)
 	(delete-file file-elisp)
 	(delete-region (point-at-bol) (point-at-bol 2)))
       (write-region (point-min) (point-max) qfile))))
+
+(defun smtpmail--sanitize-error-message (string)
+  "Try to remove passwords and the like from SMTP error messages."
+  (replace-regexp-in-string "\\bAUTH\\b.*" "AUTH" string))
 
 (defun smtpmail-fqdn ()
   (if smtpmail-local-domain
@@ -654,10 +667,12 @@ Returns an error if the server cannot be contacted."
 	      user-mail-address))))
 
 (defun smtpmail-via-smtp (recipient smtpmail-text-buffer
-				    &optional ask-for-password)
+				    &optional ask-for-password
+                                    send-attempts)
   (unless smtpmail-smtp-server
     (smtpmail-query-smtp-server))
   (let ((process nil)
+        (send-attempts (or send-attempts 1))
 	(host (or smtpmail-smtp-server
 		  (error "`smtpmail-smtp-server' not defined")))
 	(port smtpmail-smtp-service)
@@ -819,6 +834,23 @@ Returns an error if the server cannot be contacted."
 	       ((smtpmail-ok-p (setq result (smtpmail-read-response process)))
 		;; Success.
 		)
+               ((and (numberp (car result))
+                     (<= 400 (car result) 499)
+                     (< send-attempts smtpmail-retries))
+                (message "Got transient error code %s when sending; retrying attempt %d..."
+                         (car result) send-attempts)
+                ;; Retry on getting a transient 4xx code; see
+                ;; https://tools.ietf.org/html/rfc5321#section-4.2.1
+                (ignore-errors
+		  (smtpmail-send-command process "QUIT")
+		  (smtpmail-read-response process))
+		(delete-process process)
+                (sleep-for 1)
+		(setq process nil)
+		(throw 'done
+		       (smtpmail-via-smtp recipient smtpmail-text-buffer
+                                          ask-for-password
+                                          (1+ send-attempts))))
 	       ((and auth-mechanisms
 		     (not ask-for-password)
 		     (eq (car result) 530))

@@ -461,7 +461,7 @@ OPTION_DEFAULT_ON([gsettings],[don't compile with GSettings support])
 OPTION_DEFAULT_ON([selinux],[don't compile with SELinux support])
 OPTION_DEFAULT_ON([gnutls],[don't use -lgnutls for SSL/TLS support])
 OPTION_DEFAULT_ON([zlib],[don't compile with zlib decompression support])
-OPTION_DEFAULT_OFF([modules],[compile with dynamic modules support])
+OPTION_DEFAULT_ON([modules],[compile with dynamic modules support])
 OPTION_DEFAULT_ON([threads],[don't compile with elisp threading support])
 
 AC_ARG_WITH([file-notification],[AS_HELP_STRING([--with-file-notification=LIB],
@@ -1114,15 +1114,16 @@ AS_IF([test $gl_gcc_warnings = no],
   fi
 
   AC_DEFINE([GCC_LINT], [1], [Define to 1 if --enable-gcc-warnings.])
-  AC_DEFINE([GNULIB_PORTCHECK], [1], [enable some gnulib portability checks])
-  AH_VERBATIM([GNULIB_PORTCHECK_FORTIFY_SOURCE],
-  [/* Enable compile-time and run-time bounds-checking, and some warnings,
-      without upsetting glibc 2.15+. */
-   #if (defined GNULIB_PORTCHECK && !defined _FORTIFY_SOURCE \
-        && defined __OPTIMIZE__ && __OPTIMIZE__)
-   # define _FORTIFY_SOURCE 2
-   #endif
-  ])
+  AS_IF([test $gl_gcc_warnings = yes],
+    [AC_DEFINE([GNULIB_PORTCHECK], [1], [enable some gnulib portability checks])
+     AH_VERBATIM([GNULIB_PORTCHECK_FORTIFY_SOURCE],
+     [/* Enable compile-time and run-time bounds-checking, and some warnings,
+	 without upsetting glibc 2.15+. */
+      #if (defined GNULIB_PORTCHECK && !defined _FORTIFY_SOURCE \
+	   && defined __OPTIMIZE__ && __OPTIMIZE__)
+      # define _FORTIFY_SOURCE 2
+      #endif
+     ])])
  ])
 
 # clang is picky about these regardless of whether
@@ -1731,26 +1732,6 @@ if test "${with_sound}" != "no"; then
     ALSA_MODULES="alsa >= $ALSA_REQUIRED"
     EMACS_CHECK_MODULES([ALSA], [$ALSA_MODULES])
     if test $HAVE_ALSA = yes; then
-      SAVE_CFLAGS="$CFLAGS"
-      SAVE_LIBS="$LIBS"
-      CFLAGS="$ALSA_CFLAGS $CFLAGS"
-      LIBS="$ALSA_LIBS $LIBS"
-      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <asoundlib.h>]], [[snd_lib_error_set_handler (0);]])],
-                      emacs_alsa_normal=yes,
-	            emacs_alsa_normal=no)
-      if test "$emacs_alsa_normal" != yes; then
-        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <alsa/asoundlib.h>]],
-                       [[snd_lib_error_set_handler (0);]])],
-                       emacs_alsa_subdir=yes,
-	             emacs_alsa_subdir=no)
-        if test "$emacs_alsa_subdir" != yes; then
-          AC_MSG_ERROR([pkg-config found alsa, but it does not compile.  See config.log for error messages.])
-        fi
-        ALSA_CFLAGS="$ALSA_CFLAGS -DALSA_SUBDIR_INCLUDE"
-      fi
-
-      CFLAGS="$SAVE_CFLAGS"
-      LIBS="$SAVE_LIBS"
       LIBSOUND="$LIBSOUND $ALSA_LIBS"
       CFLAGS_SOUND="$CFLAGS_SOUND $ALSA_CFLAGS"
       AC_DEFINE(HAVE_ALSA, 1, [Define to 1 if ALSA is available.])
@@ -2658,6 +2639,9 @@ if test "${HAVE_X11}" = "yes" || test "${HAVE_NS}" = "yes" || test "${HAVE_W32}"
     if test $HAVE_IMAGEMAGICK = yes; then
       AC_DEFINE([HAVE_IMAGEMAGICK], 1, [Define to 1 if using ImageMagick.])
     else
+      if test "${with_imagemagick}" != "no"; then
+        AC_MSG_ERROR([ImageMagick wanted, but it does not compile.  Maybe some library files are missing?]);
+      fi
       IMAGEMAGICK_CFLAGS=
       IMAGEMAGICK_LIBS=
     fi
@@ -3308,7 +3292,8 @@ fi
 # Check for XRender
 HAVE_XRENDER=no
 if test "${HAVE_X11}" = "yes"; then
-  AC_CHECK_LIB(Xrender, XRenderQueryExtension, HAVE_XRENDER=yes)
+  AC_CHECK_HEADER([X11/extensions/Xrender.h],
+    [AC_CHECK_LIB([Xrender], [XRenderQueryExtension], [HAVE_XRENDER=yes])])
   if test $HAVE_XRENDER = yes; then
     XRENDER_LIBS="-lXrender"
     AC_SUBST(XRENDER_LIBS)

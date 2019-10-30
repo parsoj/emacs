@@ -166,6 +166,7 @@ enum window_part
   ON_MODE_LINE,
   ON_VERTICAL_BORDER,
   ON_HEADER_LINE,
+  ON_TAB_LINE,
   ON_LEFT_FRINGE,
   ON_RIGHT_FRINGE,
   ON_LEFT_MARGIN,
@@ -762,6 +763,9 @@ struct glyph_matrix
      which do their own scrolling.  */
   bool_bf no_scrolling_p : 1;
 
+  /* True means window displayed in this matrix has a tab line.  */
+  bool_bf tab_line_p : 1;
+
   /* True means window displayed in this matrix has a header
      line.  */
   bool_bf header_line_p : 1;
@@ -1001,8 +1005,11 @@ struct glyph_row
      implies that the row doesn't have marginal areas.  */
   bool_bf full_width_p : 1;
 
-  /* True means row is a mode or header-line.  */
+  /* True means row is a mode or header/tab-line.  */
   bool_bf mode_line_p : 1;
+
+  /* True means row is a tab-line.  */
+  bool_bf tab_line_p : 1;
 
   /* True in a current row means this row is overlapped by another row.  */
   bool_bf overlapped_p : 1;
@@ -1084,16 +1091,25 @@ struct glyph_row *matrix_row (struct glyph_matrix *, int);
 #define MATRIX_MODE_LINE_ROW(MATRIX) \
      ((MATRIX)->rows + (MATRIX)->nrows - 1)
 
-/* Return a pointer to the row reserved for the header line in MATRIX.
+/* Return a pointer to the row reserved for the tab line in MATRIX.
    This is always the first row in MATRIX because that's the only
    way that works in frame-based redisplay.  */
 
-#define MATRIX_HEADER_LINE_ROW(MATRIX) (MATRIX)->rows
+#define MATRIX_TAB_LINE_ROW(MATRIX) (MATRIX)->rows
+
+/* Return a pointer to the row reserved for the header line in MATRIX.
+   This is always the second row in MATRIX because that's the only
+   way that works in frame-based redisplay.  */
+
+#define MATRIX_HEADER_LINE_ROW(MATRIX) \
+     ((MATRIX)->tab_line_p ? ((MATRIX)->rows + 1) : (MATRIX)->rows)
 
 /* Return a pointer to first row in MATRIX used for text display.  */
 
 #define MATRIX_FIRST_TEXT_ROW(MATRIX) \
-     ((MATRIX)->rows->mode_line_p ? (MATRIX)->rows + 1 : (MATRIX)->rows)
+  ((MATRIX)->rows->mode_line_p ?                                        \
+   (((MATRIX)->rows + 1)->mode_line_p ?                                 \
+    (MATRIX)->rows + 2 : (MATRIX)->rows + 1) : (MATRIX)->rows)
 
 /* Return a pointer to the first glyph in the text area of a row.
    MATRIX is the glyph matrix accessed, and ROW is the row index in
@@ -1162,7 +1178,7 @@ struct glyph_row *matrix_row (struct glyph_matrix *, int);
   ((ROW)->height != (ROW)->visible_height)
 
 #define MR_PARTIALLY_VISIBLE_AT_TOP(W, ROW)  \
-  ((ROW)->y < WINDOW_HEADER_LINE_HEIGHT ((W)))
+  ((ROW)->y < WINDOW_TAB_LINE_HEIGHT (W) + WINDOW_HEADER_LINE_HEIGHT (W))
 
 #define MR_PARTIALLY_VISIBLE_AT_BOTTOM(W, ROW)  \
   (((ROW)->y + (ROW)->height - (ROW)->extra_line_spacing) \
@@ -1433,6 +1449,15 @@ struct glyph_string
       ? MATRIX_HEADER_LINE_ROW (MATRIX)->height	\
       : 0)
 
+/* Return the height of the tab line in glyph matrix MATRIX, or zero
+   if not known.  This macro is called under circumstances where
+   MATRIX might not have been allocated yet.  */
+
+#define MATRIX_TAB_LINE_HEIGHT(MATRIX)	\
+     ((MATRIX) && (MATRIX)->rows		\
+      ? MATRIX_TAB_LINE_ROW (MATRIX)->height	\
+      : 0)
+
 /* Return the desired face id for the mode line of a window, depending
    on whether the window is selected or not, or if the window is the
    scrolling window for the currently active minibuffer window.
@@ -1464,26 +1489,39 @@ struct glyph_string
    a default based on the height of the font of the face `mode-line'.  */
 
 #define CURRENT_MODE_LINE_HEIGHT(W)					\
-  (W->mode_line_height >= 0						\
-   ? W->mode_line_height						\
-   : (W->mode_line_height						\
-      = (MATRIX_MODE_LINE_HEIGHT (W->current_matrix)			\
-	 ? MATRIX_MODE_LINE_HEIGHT (W->current_matrix)			\
+  ((W)->mode_line_height >= 0						\
+   ? (W)->mode_line_height						\
+   : ((W)->mode_line_height						\
+      = (MATRIX_MODE_LINE_HEIGHT ((W)->current_matrix)			\
+	 ? MATRIX_MODE_LINE_HEIGHT ((W)->current_matrix)		\
 	 : estimate_mode_line_height					\
-	     (XFRAME (W->frame), CURRENT_MODE_LINE_FACE_ID (W)))))
+	     (XFRAME ((W)->frame), CURRENT_MODE_LINE_FACE_ID (W)))))
 
 /* Return the current height of the header line of window W.  If not known
    from W->header_line_height, look at W's current glyph matrix, or return
    an estimation based on the height of the font of the face `header-line'.  */
 
 #define CURRENT_HEADER_LINE_HEIGHT(W)				\
-  (W->header_line_height >= 0					\
-   ? W->header_line_height					\
-   : (W->header_line_height					\
-      = (MATRIX_HEADER_LINE_HEIGHT (W->current_matrix)		\
-	 ? MATRIX_HEADER_LINE_HEIGHT (W->current_matrix)	\
+  ((W)->header_line_height >= 0					\
+   ? (W)->header_line_height					\
+   : ((W)->header_line_height					\
+      = (MATRIX_HEADER_LINE_HEIGHT ((W)->current_matrix)	\
+	 ? MATRIX_HEADER_LINE_HEIGHT ((W)->current_matrix)	\
 	 : estimate_mode_line_height				\
-	     (XFRAME (W->frame), HEADER_LINE_FACE_ID))))
+	     (XFRAME ((W)->frame), HEADER_LINE_FACE_ID))))
+
+/* Return the current height of the tab line of window W.  If not known
+   from W->tab_line_height, look at W's current glyph matrix, or return
+   an estimation based on the height of the font of the face `tab-line'.  */
+
+#define CURRENT_TAB_LINE_HEIGHT(W)				\
+  ((W)->tab_line_height >= 0					\
+   ? (W)->tab_line_height					\
+   : ((W)->tab_line_height					\
+      = (MATRIX_TAB_LINE_HEIGHT ((W)->current_matrix)		\
+	 ? MATRIX_TAB_LINE_HEIGHT ((W)->current_matrix)		\
+	 : estimate_mode_line_height				\
+	     (XFRAME ((W)->frame), TAB_LINE_FACE_ID))))
 
 /* Return the height of the desired mode line of window W.  */
 
@@ -1494,6 +1532,11 @@ struct glyph_string
 
 #define DESIRED_HEADER_LINE_HEIGHT(W) \
      MATRIX_HEADER_LINE_HEIGHT ((W)->desired_matrix)
+
+/* Return the height of the desired tab line of window W.  */
+
+#define DESIRED_TAB_LINE_HEIGHT(W) \
+     MATRIX_TAB_LINE_HEIGHT ((W)->desired_matrix)
 
 /* Return proper value to be used as baseline offset of font that has
    ASCENT and DESCENT to draw characters by the font at the vertical
@@ -1564,6 +1607,7 @@ enum lface_attribute_index
   LFACE_INHERIT_INDEX,
   LFACE_FONTSET_INDEX,
   LFACE_DISTANT_FOREGROUND_INDEX,
+  LFACE_EXTEND_INDEX,
   LFACE_VECTOR_SIZE
 };
 
@@ -1589,6 +1633,7 @@ enum face_box_type
 
 enum face_underline_type
 {
+  FACE_NO_UNDERLINE = 0,
   FACE_UNDER_LINE,
   FACE_UNDER_WAVE
 };
@@ -1632,11 +1677,9 @@ struct face
   /* Pixel value or color index of background color.  */
   unsigned long background;
 
-  /* Pixel value or color index of underline color.  */
+  /* Pixel value or color index of underline, overlined,
+     strike-through, or box color.  */
   unsigned long underline_color;
-
-  /* Pixel value or color index of overlined, strike-through, or box
-     color.  */
   unsigned long overline_color;
   unsigned long strike_through_color;
   unsigned long box_color;
@@ -1663,7 +1706,7 @@ struct face
   ENUM_BF (face_box_type) box : 2;
 
   /* Style of underlining. */
-  ENUM_BF (face_underline_type) underline_type : 1;
+  ENUM_BF (face_underline_type) underline : 2;
 
   /* If `box' above specifies a 3D type, true means use box_color for
      drawing shadows.  */
@@ -1671,7 +1714,6 @@ struct face
 
   /* Non-zero if text in this face should be underlined, overlined,
      strike-through or have a box drawn around it.  */
-  bool_bf underline_p : 1;
   bool_bf overline_p : 1;
   bool_bf strike_through_p : 1;
 
@@ -1681,14 +1723,10 @@ struct face
   bool_bf foreground_defaulted_p : 1;
   bool_bf background_defaulted_p : 1;
 
-  /* True means that either no color is specified for underlining or that
-     the specified color couldn't be loaded.  Use the foreground
-     color when drawing in that case. */
-  bool_bf underline_defaulted_p : 1;
-
   /* True means that either no color is specified for the corresponding
      attribute or that the specified color couldn't be loaded.
      Use the foreground color when drawing in that case. */
+  bool_bf underline_defaulted_p : 1;
   bool_bf overline_color_defaulted_p : 1;
   bool_bf strike_through_color_defaulted_p : 1;
   bool_bf box_color_defaulted_p : 1;
@@ -1780,6 +1818,8 @@ enum face_id
   WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID,
   WINDOW_DIVIDER_LAST_PIXEL_FACE_ID,
   INTERNAL_BORDER_FACE_ID,
+  TAB_BAR_FACE_ID,
+  TAB_LINE_FACE_ID,
   BASIC_FACE_ID_SENTINEL
 };
 
@@ -1821,6 +1861,9 @@ struct face_cache
   (UNSIGNED_CMP (ID, <, FRAME_FACE_CACHE (F)->used)	\
    ? FRAME_FACE_CACHE (F)->faces_by_id[ID]		\
    : NULL)
+
+#define FACE_EXTENSIBLE_P(F)			\
+  (!NILP (F->lface[LFACE_EXTEND_INDEX]))
 
 /* True if FACE is suitable for displaying ASCII characters.  */
 INLINE bool
@@ -2282,6 +2325,9 @@ struct it
 
   /* True means multibyte characters are enabled.  */
   bool_bf multibyte_p : 1;
+
+  /* True means window has a tab line at its top.  */
+  bool_bf tab_line_p : 1;
 
   /* True means window has a mode line at its top.  */
   bool_bf header_line_p : 1;
@@ -3130,6 +3176,50 @@ struct image_cache
 
 
 /***********************************************************************
+			       Tab-bars
+ ***********************************************************************/
+
+/* Enumeration defining where to find tab-bar item information in
+   tab-bar items vectors stored with frames.  Each tab-bar item
+   occupies TAB_BAR_ITEM_NSLOTS elements in such a vector.  */
+
+enum tab_bar_item_idx
+{
+  /* The key of the tab-bar item.  Used to remove items when a binding
+     for `undefined' is found.  */
+  TAB_BAR_ITEM_KEY,
+
+  /* Non-nil if item is enabled.  */
+  TAB_BAR_ITEM_ENABLED_P,
+
+  /* Non-nil if item is selected (pressed).  */
+  TAB_BAR_ITEM_SELECTED_P,
+
+  /* Caption.  */
+  TAB_BAR_ITEM_CAPTION,
+
+  /* The binding.  */
+  TAB_BAR_ITEM_BINDING,
+
+  /* Help string.  */
+  TAB_BAR_ITEM_HELP,
+
+  /* Sentinel = number of slots in tab_bar_items occupied by one
+     tab-bar item.  */
+  TAB_BAR_ITEM_NSLOTS
+};
+
+/* Default values of the above variables.  */
+
+#define DEFAULT_TAB_BAR_BUTTON_MARGIN 4
+#define DEFAULT_TAB_BAR_BUTTON_RELIEF 1
+
+/* The height in pixels of the default tab-bar images.  */
+
+#define DEFAULT_TAB_BAR_IMAGE_HEIGHT 18
+
+
+/***********************************************************************
 			       Tool-bars
  ***********************************************************************/
 
@@ -3285,6 +3375,7 @@ extern bool help_echo_showing_p;
 extern Lisp_Object help_echo_string, help_echo_window;
 extern Lisp_Object help_echo_object, previous_help_echo_string;
 extern ptrdiff_t help_echo_pos;
+extern int last_tab_bar_item;
 extern int last_tool_bar_item;
 extern void reseat_at_previous_visible_line_start (struct it *);
 extern Lisp_Object lookup_glyphless_char_display (int, struct it *);
@@ -3332,6 +3423,8 @@ extern void get_glyph_string_clip_rect (struct glyph_string *,
                                         NativeRectangle *nr);
 extern Lisp_Object find_hot_spot (Lisp_Object, int, int);
 
+extern void handle_tab_bar_click (struct frame *,
+                                   int, int, bool, int);
 extern void handle_tool_bar_click (struct frame *,
                                    int, int, bool, int);
 
@@ -3458,12 +3551,13 @@ int lookup_derived_face (struct window *, struct frame *,
 void init_frame_faces (struct frame *);
 void free_frame_faces (struct frame *);
 void recompute_basic_faces (struct frame *);
-int face_at_buffer_position (struct window *, ptrdiff_t, ptrdiff_t *, ptrdiff_t,
-                             bool, int);
+int face_at_buffer_position (struct window *, ptrdiff_t, ptrdiff_t *,
+                             ptrdiff_t, bool, int, enum lface_attribute_index);
 int face_for_overlay_string (struct window *, ptrdiff_t, ptrdiff_t *, ptrdiff_t,
                              bool, Lisp_Object);
 int face_at_string_position (struct window *, Lisp_Object, ptrdiff_t, ptrdiff_t,
-                             ptrdiff_t *, enum face_id, bool);
+                             ptrdiff_t *, enum face_id, bool,
+                             enum lface_attribute_index);
 int merge_faces (struct window *, Lisp_Object, int, int);
 int compute_char_face (struct frame *, int, Lisp_Object);
 void free_all_realized_faces (Lisp_Object);

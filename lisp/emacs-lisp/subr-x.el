@@ -182,6 +182,7 @@ with an old syntax that accepted only one binding."
     (setq spec (list spec)))
   (list 'if-let* spec then (macroexp-progn else)))
 
+;;;###autoload
 (defmacro when-let (spec &rest body)
   "Bind variables according to SPEC and conditionally evaluate BODY.
 Evaluate each binding in turn, stopping if a binding value is nil.
@@ -236,7 +237,9 @@ TRIM-LEFT and TRIM-RIGHT default to \"[ \\t\\n\\r]+\"."
   (string-trim-left (string-trim-right string trim-right) trim-left))
 
 (defsubst string-blank-p (string)
-  "Check whether STRING is either empty or only whitespace."
+  "Check whether STRING is either empty or only whitespace.
+The following characters count as whitespace here: space, tab, newline and
+carriage return."
   (string-match-p "\\`[ \t\n\r]*\\'" string))
 
 (defsubst string-remove-prefix (prefix string)

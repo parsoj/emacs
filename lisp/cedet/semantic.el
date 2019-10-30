@@ -368,8 +368,7 @@ to use Semantic, and `semantic-init-hook' is run."
 
 ;;; Parsing Commands
 ;;
-(eval-when-compile
-  (condition-case nil (require 'pp) (error nil)))
+(require 'pp)
 
 (defvar semantic-edebug nil
   "When non-nil, activate the interactive parsing debugger.
@@ -535,7 +534,6 @@ is requested."
   (set (make-local-variable 'semantic-bovinate-nonterminal-check-obarray)
        nil)
   (semantic-parse-tree-set-up-to-date)
-  (semantic-make-local-hook 'after-change-functions)
   (add-hook 'after-change-functions 'semantic-change-function nil t)
   (run-hook-with-args 'semantic-after-toplevel-cache-change-hook
 		      semantic--buffer-cache)

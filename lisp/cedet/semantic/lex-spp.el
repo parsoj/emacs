@@ -1071,7 +1071,7 @@ and variable state from the current buffer."
 	      (error nil))
 
 	    ;; Hack in mode-local
-	    (activate-mode-local-bindings)
+	    (mode-local--activate-bindings)
 
 	    ;; Call the major mode's setup function
 	    (let ((entry (assq major-mode semantic-new-buffer-setup-functions)))
@@ -1244,7 +1244,7 @@ For languages that use the Semantic pre-processor, this can
 improve the accuracy of parsed files where include files
 can change the state of what's parsed in the current file.
 
-Note: Note implemented yet"
+Note: Not implemented yet."
   :group 'semantic
   :type 'boolean)
 

@@ -789,7 +789,6 @@ Vi's prefix argument will be used.  Otherwise, the prefix argument passed to
 	    viper-emacs-kbd-minor-mode
 	    ch)
 	(cond ((and viper-special-input-method
-		    (featurep 'emacs)
 		    (fboundp 'quail-input-method))
 	       ;; (let ...) is used to restore unread-command-events to the
 	       ;; original state. We don't want anything left in there after
@@ -2594,9 +2593,8 @@ On reaching beginning of line, stop and signal error."
   (condition-case nil
       ;; do not use forward-line! need to keep column
       (let ((line-move-visual nil))
-	(if (featurep 'emacs)
-	    (with-no-warnings (next-line arg))
-	  (next-line arg)))
+	(with-no-warnings
+          (next-line arg)))
     (error nil)))
 
 
@@ -2886,9 +2884,8 @@ On reaching beginning of line, stop and signal error."
     (if com (viper-move-marker-locally 'viper-com-point (point)))
     ;; do not use forward-line! need to keep column
     (let ((line-move-visual nil))
-      (if (featurep 'emacs)
-	  (with-no-warnings (next-line val))
-	(next-line val)))
+      (with-no-warnings
+        (next-line val)))
     (if viper-ex-style-motion
 	(if (and (eolp) (not (bolp))) (backward-char 1)))
     (setq this-command 'next-line)
@@ -2934,9 +2931,8 @@ If point is on a widget or a button, simulate clicking on that widget/button."
     (if com (viper-move-marker-locally 'viper-com-point (point)))
     ;; do not use forward-line! need to keep column
     (let ((line-move-visual nil))
-      (if (featurep 'emacs)
-	  (with-no-warnings (previous-line val))
-	(previous-line val)))
+      (with-no-warnings
+        (previous-line val)))
     (if viper-ex-style-motion
 	(if (and (eolp) (not (bolp))) (backward-char 1)))
     (setq this-command 'previous-line)
@@ -4760,14 +4756,12 @@ Please, specify your level now: "))
 (defun viper-submit-report ()
   "Submit bug report on Viper."
   (interactive)
-  (defvar viper-device-type)
   (defvar viper-color-display-p)
   (defvar viper-frame-parameters)
   (defvar viper-minibuffer-emacs-face)
   (defvar viper-minibuffer-vi-face)
   (defvar viper-minibuffer-insert-face)
   (let ((reporter-prompt-for-summary-p t)
-	(viper-device-type (viper-device-type))
 	(viper-color-display-p (if (viper-window-display-p)
 			      (viper-color-display-p)
                               'non-x))
@@ -4828,7 +4822,7 @@ Please, specify your level now: "))
 		        'ex-cycle-through-non-files
 		        'viper-expert-level
 		        'major-mode
-		        'viper-device-type
+		        'window-system
 			'viper-color-display-p
 			'viper-frame-parameters
 			'viper-minibuffer-vi-face
