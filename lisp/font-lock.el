@@ -1106,8 +1106,10 @@ This functions is a convenience functions when developing font
 locking for a mode, and is not meant to be called from lisp functions."
   (interactive)
   (declare (interactive-only t))
-  (setq font-lock-major-mode nil
-        syntax-propertize--done -1)
+  ;; Make font-lock recalculate all the mode-specific data.
+  (setq font-lock-major-mode nil)
+  ;; Make the syntax machinery discard all information.
+  (syntax-ppss-flush-cache -1)
   (font-lock-set-defaults)
   (save-excursion
     (font-lock-fontify-region (point-min) (point-max))))
@@ -1900,18 +1902,13 @@ Sets various variables using `font-lock-defaults' and
 	   (removed-keywords
 	    (cdr-safe (assq major-mode font-lock-removed-keywords-alist))))
       ;; Syntactic fontification?
-      (if (nth 1 defaults)
-          (set (make-local-variable 'font-lock-keywords-only) t)
-        (kill-local-variable 'font-lock-keywords-only))
+      (setq-local font-lock-keywords-only (nth 1 defaults))
       ;; Case fold during regexp fontification?
-      (if (nth 2 defaults)
-          (set (make-local-variable 'font-lock-keywords-case-fold-search) t)
-        (kill-local-variable 'font-lock-keywords-case-fold-search))
+      (setq-local font-lock-keywords-case-fold-search (nth 2 defaults))
       ;; Syntax table for regexp and syntactic fontification?
       (if (null (nth 3 defaults))
-          (kill-local-variable 'font-lock-syntax-table)
-	(set (make-local-variable 'font-lock-syntax-table)
-	     (copy-syntax-table (syntax-table)))
+          (setq-local font-lock-syntax-table nil)
+	(setq-local font-lock-syntax-table (copy-syntax-table (syntax-table)))
 	(dolist (selem (nth 3 defaults))
 	  ;; The character to modify may be a single CHAR or a STRING.
 	  (let ((syntax (cdr selem)))
